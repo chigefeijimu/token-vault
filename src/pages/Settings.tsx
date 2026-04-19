@@ -4,15 +4,15 @@ import { Button } from "../components/common/Button"
 import { Input } from "../components/common/Input"
 import { CHAINS } from "../types/wallet"
 import { useSecurityStore } from "../stores/securityStore"
+import { useI18nStore, LANGUAGES as I18N_LANGUAGES } from "../i18n"
 import { Lock, Eye, EyeOff, Shield, Clock } from "lucide-react"
 
 const DEFAULT_CHAIN_IDS = [1, 56, 137, 42161, 10, 43114]
 
-const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "zh", label: "简体中文" },
-  { value: "ja", label: "日本語" },
-  { value: "es", label: "Español" },
+const THEMES = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
 ]
 
 const CURRENCIES = [
@@ -21,12 +21,6 @@ const CURRENCIES = [
   { value: "JPY", label: "JPY", symbol: "¥" },
   { value: "EUR", label: "EUR", symbol: "€" },
   { value: "GBP", label: "GBP", symbol: "£" },
-]
-
-const THEMES = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
 ]
 
 const STORAGE_KEY = "settings"
@@ -402,6 +396,14 @@ export function Settings() {
   const [saved, setSaved] = useState(false)
   const [editingRpc, setEditingRpc] = useState<number | null>(null)
 
+  // Sync i18n store language on mount
+  useEffect(() => {
+    const savedLang = loadSettings().language as 'en' | 'zh' | 'ja'
+    if (savedLang && savedLang !== useI18nStore.getState().language) {
+      useI18nStore.getState().setLanguage(savedLang)
+    }
+  }, [])
+
   useEffect(() => {
     applyTheme(settings.theme)
   }, [settings.theme])
@@ -473,10 +475,13 @@ export function Settings() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {LANGUAGES.map(lang => (
+            {I18N_LANGUAGES.map(lang => (
               <button
                 key={lang.value}
-                onClick={() => setSettings(prev => ({ ...prev, language: lang.value }))}
+                onClick={() => {
+                  setSettings(prev => ({ ...prev, language: lang.value }))
+                  useI18nStore.getState().setLanguage(lang.value)
+                }}
                 className={`px-3 py-2 text-sm rounded-lg border transition ${
                   settings.language === lang.value
                     ? "border-vault-gradient bg-vault-gradient/10 text-vault-text"

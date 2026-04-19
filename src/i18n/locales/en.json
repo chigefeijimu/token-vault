@@ -1,0 +1,45 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "send": "Send",
+    "settings": "Settings",
+    "createWallet": "Create Wallet",
+    "importWallet": "Import Wallet",
+    "tokens": "Tokens"
+  },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "wallet": {
+    "create": "Create",
+    "import": "Import",
+    "backup": "Backup",
+    "balance": "Balance",
+    "address": "Address",
+    "copy": "Copy",
+    "export": "Export"
+  },
+  "send": {
+    "to": "To",
+    "amount": "Amount",
+    "gas": "Gas",
+    "confirm": "Confirm",
+    "success": "Transaction Successful",
+    "failure": "Transaction Failed"
+  },
+  "settings": {
+    "language": "Language",
+    "currency": "Currency",
+    "theme": "Theme",
+    "rpc": "RPC",
+    "about": "About",
+    "version": "Version"
+  }
+}

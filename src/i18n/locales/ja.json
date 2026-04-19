@@ -1,0 +1,45 @@
+{
+  "navigation": {
+    "dashboard": "ダッシュボード",
+    "send": "送る",
+    "settings": "設定",
+    "createWallet": "钱包を作成",
+    "importWallet": " walletをインポート",
+    "tokens": "トークン"
+  },
+  "common": {
+    "confirm": "確認",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功"
+  },
+  "wallet": {
+    "create": "作成",
+    "import": "インポート",
+    "backup": "バックアップ",
+    "balance": "残高",
+    "address": "アドレス",
+    "copy": "コピー",
+    "export": "エクスポート"
+  },
+  "send": {
+    "to": "宛先",
+    "amount": "金額",
+    "gas": "Gas",
+    "confirm": "確認",
+    "success": "取引成功",
+    "failure": "取引失敗"
+  },
+  "settings": {
+    "language": "言語",
+    "currency": "通貨",
+    "theme": "テーマ",
+    "rpc": "RPC",
+    "about": "概要",
+    "version": "バージョン"
+  }
+}

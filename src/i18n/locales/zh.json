@@ -1,0 +1,45 @@
+{
+  "navigation": {
+    "dashboard": "仪表板",
+    "send": "发送",
+    "settings": "设置",
+    "createWallet": "创建钱包",
+    "importWallet": "导入钱包",
+    "tokens": "代币"
+  },
+  "common": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功"
+  },
+  "wallet": {
+    "create": "创建",
+    "import": "导入",
+    "backup": "备份",
+    "balance": "余额",
+    "address": "地址",
+    "copy": "复制",
+    "export": "导出"
+  },
+  "send": {
+    "to": "发送至",
+    "amount": "金额",
+    "gas": "Gas",
+    "confirm": "确认",
+    "success": "交易成功",
+    "failure": "交易失败"
+  },
+  "settings": {
+    "language": "语言",
+    "currency": "货币",
+    "theme": "主题",
+    "rpc": "RPC",
+    "about": "关于",
+    "version": "版本"
+  }
+}
