@@ -1,0 +1,482 @@
+.container {
+  background: var(--card-bg, #1a1a2e);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 600px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  margin: 0;
+}
+
+.currentNetwork {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 14px;
+}
+
+.customBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary, #0f0f23);
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  color: var(--text-primary, #fff);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.activeTab {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.content {
+  min-height: 200px;
+}
+
+.networkGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.networkCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-secondary, #0f0f23);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.networkCard:hover {
+  border-color: rgba(102, 126, 234, 0.5);
+  transform: translateY(-2px);
+}
+
+.networkCard.active {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.networkIconLarge {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.networkIconLarge.testnet {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.networkName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  margin-bottom: 4px;
+}
+
+.networkSymbol {
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0a0);
+}
+
+.networkId {
+  font-size: 11px;
+  color: var(--text-tertiary, #666);
+  margin-top: 4px;
+}
+
+.customSection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.savedNetworks h4,
+.customFormSection h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  margin: 0 0 12px 0;
+}
+
+.networkList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.customNetworkItem {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-secondary, #0f0f23);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.customNetworkItem:hover {
+  border-color: rgba(102, 126, 234, 0.5);
+}
+
+.customNetworkItem.active {
+  border-color: #667eea;
+}
+
+.customNetworkName {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary, #fff);
+  text-align: left;
+}
+
+.customNetworkId {
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0a0);
+  margin-right: 12px;
+}
+
+.deleteButton {
+  padding: 4px 12px;
+  background: rgba(239, 68, 68, 0.2);
+  border: none;
+  border-radius: 4px;
+  color: #ef4444;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deleteButton:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
+
+.customFormSection {
+  background: var(--bg-secondary, #0f0f23);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.formGroup {
+  margin-bottom: 12px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0a0);
+  margin-bottom: 6px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-primary, #0a0a1a);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.input::placeholder {
+  color: var(--text-tertiary, #666);
+}
+
+.submitButton {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.submitButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0a0);
+}
+
+/* Compact variant */
+.compactSelector {
+  position: relative;
+  display: inline-block;
+}
+
+.compactButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #0f0f23);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.compactButton:hover {
+  border-color: #667eea;
+}
+
+.chainIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chainSymbol {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+
+.chainId {
+  font-size: 11px;
+  color: var(--text-tertiary, #666);
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.chainId.custom {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.arrow {
+  font-size: 10px;
+  color: var(--text-tertiary, #666);
+  transition: transform 0.2s ease;
+}
+
+.compactDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: var(--card-bg, #1a1a2e);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.compactTabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tabButton {
+  flex: 1;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tabButton:hover {
+  color: var(--text-primary, #fff);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tabButton.active {
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.compactContent {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.chainList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chainItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.chainItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.chainItem.selected {
+  background: rgba(102, 126, 234, 0.2);
+}
+
+.chainName {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary, #fff);
+}
+
+.chainIdBadge {
+  font-size: 11px;
+  color: var(--text-tertiary, #666);
+}
+
+.sectionLabel {
+  font-size: 11px;
+  color: var(--text-secondary, #a0a0a0);
+  margin: 8px 0 4px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.customForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.customChainsList {
+  margin-bottom: 8px;
+}
+
+.removeButton {
+  padding: 2px 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: none;
+  border-radius: 4px;
+  color: #ef4444;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chainItem:hover .removeButton {
+  opacity: 1;
+}
+
+.addButton {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.addButton:hover:not(:disabled) {
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
