@@ -1,130 +1,155 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useWalletStore } from '../stores/walletStore'
+import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useNavigate } from "react-router-dom";
+import { CHAINS } from "../types/wallet";
+
+interface CreateWalletResponse {
+  address: string;
+  id: string;
+  name: string;
+}
 
 export function CreateWallet() {
-  const navigate = useNavigate()
-  const { createWallet } = useWalletStore()
-  const [name, setName] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-  const [step, setStep] = useState<'form' | 'mnemonic'>('form')
-  const [generatedMnemonic, setGeneratedMnemonic] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
+  const navigate = useNavigate();
+  const [step, setStep] = useState<"form" | "created">("form");
+  const [wallet, setWallet] = useState<CreateWalletResponse | null>(null);
+  const [walletName, setWalletName] = useState("");
+  const [chainId, setChainId] = useState(1);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleCreate = async () => {
-    if (!name.trim()) {
-      setError('Please enter a wallet name')
-      return
+  async function handleCreate() {
+    if (!walletName.trim()) { setError("Wallet name is required"); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (password !== confirmPassword) { setError("Passwords do not match"); return; }
+    setError("");
+    setLoading(true);
+    try {
+      const result = await invoke<CreateWalletResponse>("create_wallet", {
+        chainId,
+        password,
+        walletName,
+      });
+      setWallet(result);
+      setStep("created");
+    } catch (e: unknown) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-
-    setIsCreating(true)
-    const result = await createWallet(name, password)
-    setIsCreating(false)
-
-    if (result.success) {
-      setGeneratedMnemonic(result.mnemonic || '')
-      setStep('mnemonic')
-    } else {
-      setError(result.error || 'Failed to create wallet')
-    }
-  }
-
-  const handleDone = () => {
-    navigate('/')
   }
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
-      <button
-        onClick={() => navigate('/')}
-        className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
-      >
-        ← Back
-      </button>
+    <div className="p-4 sm:p-6 max-w-xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-vault-text">Create Wallet</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Generate a new multi-chain wallet</p>
+      </div>
 
-      <h1 className="text-2xl font-bold mb-6">Create New Wallet</h1>
-
-      {step === 'form' && (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Wallet Name</label>
+      {step === "form" && (
+        <>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-400">Wallet Name</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={walletName}
+              onChange={(e) => setWalletName(e.target.value)}
               placeholder="My Wallet"
-              className="w-full px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none"
+              className="w-full bg-vault-card border border-vault-border rounded-lg px-3 py-2.5 text-vault-text text-sm"
             />
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-400">Network</label>
+            <select
+              value={chainId}
+              onChange={(e) => setChainId(Number(e.target.value))}
+              className="w-full bg-vault-card border border-vault-border rounded-lg px-3 py-2.5 text-vault-text text-sm"
+            >
+              {CHAINS.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm text-gray-400">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Min 8 characters"
-              className="w-full px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none"
+              className="w-full bg-vault-card border border-vault-border rounded-lg px-3 py-2.5 text-vault-text text-sm"
             />
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Confirm Password</label>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-400">Confirm Password</label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm password"
-              className="w-full px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none"
+              placeholder="Repeat password"
+              className="w-full bg-vault-card border border-vault-border rounded-lg px-3 py-2.5 text-vault-text text-sm"
             />
           </div>
 
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <div className="bg-red-900/30 border border-red-700 rounded-lg px-3 py-2 text-red-400 text-sm">
+              {error}
+            </div>
           )}
 
           <button
             onClick={handleCreate}
-            disabled={isCreating}
-            className="w-full py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+            disabled={loading}
+            className="w-full py-3 bg-vault-gradient text-white rounded-lg font-medium text-sm disabled:opacity-40"
           >
-            {isCreating ? 'Creating...' : 'Create Wallet'}
+            {loading ? "Creating..." : "Create Wallet"}
           </button>
-        </div>
+        </>
       )}
 
-      {step === 'mnemonic' && (
-        <div>
-          <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4 mb-4">
-            <p className="text-yellow-500 font-medium mb-2">⚠️ Save Your Recovery Phrase</p>
-            <p className="text-sm text-gray-400 mb-3">
-              Write down these 12 words and keep them safe. This is the only way to recover your wallet.
-            </p>
-            <div className="bg-gray-900 p-4 rounded-lg">
-              <p className="font-mono text-sm leading-relaxed break-all">
-                {generatedMnemonic}
-              </p>
-            </div>
+      {step === "created" && wallet && (
+        <>
+          <div className="bg-green-900/30 border border-green-600 rounded-lg px-4 py-3 text-green-300 text-sm">
+            ✅ Wallet created successfully!
           </div>
 
-          <button
-            onClick={handleDone}
-            className="w-full py-3 bg-green-600 rounded-lg hover:bg-green-700 transition"
-          >
-            I've Saved My Recovery Phrase
-          </button>
-        </div>
+          <div className="bg-vault-card border border-vault-border rounded-xl p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-400">Name</span>
+            </div>
+            <p className="text-vault-text font-medium">{wallet.name}</p>
+          </div>
+
+          <div className="bg-vault-card border border-vault-border rounded-xl p-4">
+            <span className="text-sm text-gray-400">Address</span>
+            <p className="text-vault-text font-mono text-sm mt-1 break-all">{wallet.address}</p>
+          </div>
+
+          <div className="bg-amber-900/30 border border-amber-600 rounded-lg px-4 py-3 text-amber-300 text-sm">
+            ⚠️ IMPORTANT: Back up your wallet! Go to Wallet Details to export your private key. Never share it with anyone.
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="flex-1 py-3 bg-vault-gradient text-white rounded-lg font-medium text-sm"
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={() => navigate(`/wallet/${wallet.id}`)}
+              className="flex-1 py-3 bg-vault-card border border-vault-border text-vault-text rounded-lg font-medium text-sm"
+            >
+              View Wallet
+            </button>
+          </div>
+        </>
       )}
     </div>
-  )
+  );
 }
