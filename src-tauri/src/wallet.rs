@@ -25,12 +25,20 @@ pub struct WalletInfo {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletData {
+    pub mnemonic: String,
+    pub private_key: String,
+    pub address: String,
+}
+
 #[derive(Debug, Clone)]
 struct StoredWallet {
     info: WalletInfo,
     encrypted_private_key: Vec<u8>,
     salt: Vec<u8>,
     password_hash: Option<String>,
+    mnemonic: Option<String>,
 }
 
 pub struct WalletManager {
@@ -73,6 +81,7 @@ impl WalletManager {
             encrypted_private_key: private_key,
             salt: salt.to_vec(),
             password_hash: Some(hex::encode(&password_hash)),
+            mnemonic: Some(mnemonic),
         };
 
         self.wallets.insert(id, wallet);
@@ -107,6 +116,7 @@ impl WalletManager {
             encrypted_private_key: private_key,
             salt: salt.to_vec(),
             password_hash: Some(hex::encode(&password_hash)),
+            mnemonic: Some(mnemonic.to_string()),
         };
 
         self.wallets.insert(id, wallet);
@@ -140,6 +150,7 @@ impl WalletManager {
             encrypted_private_key: private_key,
             salt: salt.to_vec(),
             password_hash: Some(hex::encode(&password_hash)),
+            mnemonic: None,
         };
 
         self.wallets.insert(id, wallet);
@@ -177,6 +188,30 @@ impl WalletManager {
         }
 
         Ok(format!("0x{}", hex::encode(&wallet.encrypted_private_key)))
+    }
+
+    pub fn decrypt_wallet(
+        &self,
+        wallet_id: &str,
+        password: &str,
+    ) -> Result<WalletData, WalletError> {
+        let wallet = self.wallets.get(wallet_id)
+            .ok_or_else(|| WalletError::NotFound(format!("Wallet not found: {}", wallet_id)))?;
+
+        if let Some(ref hash) = wallet.password_hash {
+            if !crypto::verify_password(password, &wallet.salt, &hex::decode(hash).unwrap_or_default()) {
+                return Err(WalletError::InvalidPassword);
+            }
+        }
+
+        let mnemonic = wallet.mnemonic.clone()
+            .ok_or_else(|| WalletError::NotFound("Mnemonic not available for this wallet".into()))?;
+
+        Ok(WalletData {
+            mnemonic,
+            private_key: format!("0x{}", hex::encode(&wallet.encrypted_private_key)),
+            address: wallet.info.address.clone(),
+        })
     }
 }
 
@@ -233,4 +268,10 @@ pub fn delete_wallet(id: String) -> Result<(), String> {
 pub fn export_private_key(id: String, password: String) -> Result<String, String> {
     let manager = WalletManager::new();
     manager.export_private_key(&id, &password).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn decrypt_wallet(id: String, password: String) -> Result<WalletData, String> {
+    let manager = WalletManager::new();
+    manager.decrypt_wallet(&id, &password).map_err(|e| e.to_string())
 }

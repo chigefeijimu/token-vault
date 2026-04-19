@@ -27,6 +27,7 @@ pub fn run() {
             wallet::get_wallet_info,
             wallet::delete_wallet,
             wallet::export_private_key,
+            wallet::decrypt_wallet,
             // RPC commands
             rpc::get_chain_config,
             rpc::get_balance,
