@@ -1,10 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #0f0f1a;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,142 +23,31 @@
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background-color: #0f0f1a;
 }
 
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
   width: 100%;
+  min-height: 100vh;
 }
 
-header {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-}
-
-header p {
-  color: #888;
-}
-
-.card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.card h2 {
-  margin-bottom: 1rem;
-  font-size: 1.25rem;
-}
-
-select {
-  width: 100%;
-  padding: 0.75rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.2);
-  color: white;
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-button {
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  border: none;
-  background: #646cff;
-  color: white;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-button:hover:not(:disabled) {
-  background: #535bf2;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.wallet-info {
-  margin-top: 1rem;
-  text-align: left;
-}
-
-.wallet-info code {
-  display: block;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  word-break: break-all;
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
-}
-
-.wallet-info p {
-  margin-top: 0.5rem;
-}
-
-a {
-  color: #646cff;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-@media (prefers-color-scheme: light) {
+/* Vault design tokens */
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    --vault-bg: #0f0f1a;
+    --vault-card: #1a1a2e;
+    --vault-border: #2a2a4e;
+    --vault-text: #e0e0ff;
+    --vault-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
-  
-  .card {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
-  }
-  
-  select {
-    background: #ffffff;
-    border: 1px solid #ccc;
-    color: #213547;
-  }
-  
-  .wallet-info code {
-    background: #f0f0f0;
-  }
-  
-  button {
-    background: #475569;
-  }
-  
-  button:hover:not(:disabled) {
-    background: #334155;
-  }
-  
-  a {
-    color: #475569;
-  }
+}
+
+@layer components {
+  .bg-vault-bg { background-color: var(--vault-bg); }
+  .bg-vault-card { background-color: var(--vault-card); }
+  .border-vault-border { border-color: var(--vault-border); }
+  .text-vault-text { color: var(--vault-text); }
+  .bg-vault-gradient { background: var(--vault-gradient); }
 }
