@@ -8,13 +8,13 @@ export interface NFT {
   imageUrl?: string
   animationUrl?: string
   externalUrl?: string
-  attributes?: NFTAttribute[]
-  balance?: string // For ERC-1155
+  attributes?: NFTTrait[]
+  balance?: string
   chainId: number
   owner: string
 }
 
-export interface NFTAttribute {
+export interface NFTTrait {
   traitType: string
   value: string | number
   displayType?: string
@@ -30,19 +30,10 @@ export interface NFTCollection {
   chainId: number
 }
 
-export interface NFTTransferParams {
+export interface NFTFetchOptions {
   chainId: number
-  contractAddress: string
-  from: string
-  to: string
-  tokenId: string
-  amount?: string // For ERC-1155, defaults to "1"
-}
-
-export interface NFTBalance {
-  contractAddress: string
-  tokenId: string
-  balance: string
-  contractType: 'erc721' | 'erc1155'
-  chainId: number
+  address: string
+  contractAddresses?: string[]
+  startToken?: number
+  count?: number
 }
