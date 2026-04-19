@@ -1,9 +1,15 @@
 // Wallet management and EVM chain interactions
 
 use crate::crypto::{self, CryptoError};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Mutex;
 use thiserror::Error;
+
+lazy_static! {
+    static ref WALLET_MANAGER: Mutex<WalletManager> = Mutex::new(WalletManager::new());
+}
 
 #[derive(Error, Debug)]
 pub enum WalletError {
@@ -225,7 +231,7 @@ impl Default for WalletManager {
 
 #[tauri::command]
 pub fn create_wallet(name: String, password: String) -> Result<WalletInfo, String> {
-    let mut manager = WalletManager::new();
+    let mut manager = WALLET_MANAGER.lock().unwrap();
     manager.create_wallet(&name, &password).map_err(|e| e.to_string())
 }
 
@@ -236,7 +242,7 @@ pub fn import_wallet(
     mnemonic: Option<String>,
     private_key: Option<String>,
 ) -> Result<WalletInfo, String> {
-    let mut manager = WalletManager::new();
+    let mut manager = WALLET_MANAGER.lock().unwrap();
     if let Some(mnemonic) = mnemonic {
         manager.import_from_mnemonic(&name, &mnemonic, &password).map_err(|e| e.to_string())
     } else if let Some(pk) = private_key {
@@ -248,30 +254,30 @@ pub fn import_wallet(
 
 #[tauri::command]
 pub fn list_wallets() -> Result<Vec<WalletInfo>, String> {
-    let manager = WalletManager::new();
+    let manager = WALLET_MANAGER.lock().unwrap();
     Ok(manager.list_wallets())
 }
 
 #[tauri::command]
 pub fn get_wallet_info(id: String) -> Result<WalletInfo, String> {
-    let manager = WalletManager::new();
+    let manager = WALLET_MANAGER.lock().unwrap();
     manager.get_wallet(&id).ok_or_else(|| format!("Wallet not found: {}", id))
 }
 
 #[tauri::command]
 pub fn delete_wallet(id: String) -> Result<(), String> {
-    let mut manager = WalletManager::new();
+    let mut manager = WALLET_MANAGER.lock().unwrap();
     manager.delete_wallet(&id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn export_private_key(id: String, password: String) -> Result<String, String> {
-    let manager = WalletManager::new();
+    let manager = WALLET_MANAGER.lock().unwrap();
     manager.export_private_key(&id, &password).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn decrypt_wallet(id: String, password: String) -> Result<WalletData, String> {
-    let manager = WalletManager::new();
+    let manager = WALLET_MANAGER.lock().unwrap();
     manager.decrypt_wallet(&id, &password).map_err(|e| e.to_string())
 }

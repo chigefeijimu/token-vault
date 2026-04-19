@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "../components/common/Card"
+import { Button } from "../components/common/Button"
+import { Input } from "../components/common/Input"
 import { CHAINS } from "../types/wallet"
+import { useSecurityStore } from "../stores/securityStore"
+import { Lock, Eye, EyeOff, Shield, Clock } from "lucide-react"
 
 const DEFAULT_CHAIN_IDS = [1, 56, 137, 42161, 10, 43114]
 
@@ -183,6 +187,213 @@ function ChainRpcRow({ chainId, config, onChange }: ChainRpcRowProps) {
         </button>
       </div>
     </div>
+  )
+}
+
+// App Lock Settings Component
+function AppLockSettings() {
+  const hasPasswordSet = useSecurityStore(state => state.hasPasswordSet)
+  const lockTimeout = useSecurityStore(state => state.lockTimeout)
+  const setLockPassword = useSecurityStore(state => state.setLockPassword)
+  const setLockTimeout = useSecurityStore(state => state.setLockTimeout)
+  const lock = useSecurityStore(state => state.lock)
+
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  const verifyLockPassword = useSecurityStore(state => state.verifyLockPassword)
+
+  const timeoutOptions = [
+    { value: 1, label: '1 minute' },
+    { value: 5, label: '5 minutes' },
+    { value: 15, label: '15 minutes' },
+    { value: 30, label: '30 minutes' },
+  ]
+
+  const handleChangePassword = useCallback(async () => {
+    setError('')
+    
+    if (!currentPassword) {
+      setError('Please enter current password')
+      return
+    }
+    if (!newPassword) {
+      setError('Please enter new password')
+      return
+    }
+    if (newPassword.length < 4) {
+      setError('New password must be at least 4 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match')
+      return
+    }
+
+    const isValid = await verifyLockPassword(currentPassword)
+    if (!isValid) {
+      setError('Current password is incorrect')
+      return
+    }
+
+    try {
+      await setLockPassword(newPassword)
+      setSuccess(true)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setShowChangePassword(false)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch {
+      setError('Failed to change password')
+    }
+  }, [currentPassword, newPassword, confirmPassword, verifyLockPassword, setLockPassword])
+
+  const handleDisableLock = useCallback(() => {
+    // Clear the lock password by setting a random one that won't be used
+    // The app will see hasPasswordSet as false since we clear both
+    useSecurityStore.setState({ 
+      lockPasswordHash: null, 
+      hasPasswordSet: false,
+      isLocked: false 
+    })
+  }, [])
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Lock className="w-5 h-5 text-vault-gradient" />
+          <CardTitle>App Lock</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Enable/Disable Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-vault-text-secondary" />
+            <span className="text-sm text-vault-text">Password Protection</span>
+          </div>
+          {hasPasswordSet ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-green-400">Enabled</span>
+              <button
+                onClick={handleDisableLock}
+                className="px-2 py-1 text-xs rounded border border-red-500/30 text-red-400 hover:bg-red-500/10 transition"
+              >
+                Disable
+              </button>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-500">Not set up</span>
+          )}
+        </div>
+
+        {/* Auto-lock Timeout */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-vault-text-secondary" />
+            <span className="text-sm text-vault-text">Auto-lock Timeout</span>
+          </div>
+          <select
+            value={lockTimeout}
+            onChange={(e) => setLockTimeout(Number(e.target.value))}
+            className="bg-vault-bg border border-vault-border rounded-lg px-3 py-1.5 text-sm text-vault-text focus:outline-none focus:border-vault-gradient"
+          >
+            {timeoutOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Change Password */}
+        {hasPasswordSet && (
+          <div className="pt-2 border-t border-vault-border">
+            {!showChangePassword ? (
+              <button
+                onClick={() => setShowChangePassword(true)}
+                className="text-sm text-vault-gradient hover:underline"
+              >
+                Change Password
+              </button>
+            ) : (
+              <div className="space-y-3 pt-2">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  rightElement={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1 hover:opacity-70 transition"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4 text-gray-500" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+                  }
+                />
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="New password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleChangePassword()
+                  }}
+                />
+                {error && <p className="text-sm text-red-400">{error}</p>}
+                {success && <p className="text-sm text-green-400">Password changed successfully!</p>}
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleChangePassword}>
+                    Save
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    setShowChangePassword(false)
+                    setError('')
+                    setCurrentPassword('')
+                    setNewPassword('')
+                    setConfirmPassword('')
+                  }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lock Now Button */}
+        {hasPasswordSet && (
+          <div className="pt-2 border-t border-vault-border">
+            <button
+              onClick={() => lock()}
+              className="text-sm text-vault-text-secondary hover:text-vault-text transition"
+            >
+              Lock Now
+            </button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -377,6 +588,9 @@ export function Settings() {
           })}
         </CardContent>
       </Card>
+
+      {/* App Lock Settings */}
+      <AppLockSettings />
 
       {/* Raw JSON preview */}
       <details className="group">
