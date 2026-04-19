@@ -2,7 +2,6 @@
 
 use crate::crypto::{self, CryptoError};
 use crate::storage;
-use crate::errors::AppError;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -417,6 +416,13 @@ pub fn get_wallet_info(id: String) -> Result<WalletInfo, String> {
 pub fn delete_wallet(id: String) -> Result<(), String> {
     let mut manager = WALLET_MANAGER.lock().unwrap();
     manager.delete_wallet(&id).map_err(|e| e.to_string())
+}
+
+/// Load all wallets from SQLite storage into the global WALLET_MANAGER singleton
+pub fn wallet_manager_from_storage() -> Result<(), String> {
+    let mut manager = WALLET_MANAGER.lock().map_err(|e| e.to_string())?;
+    manager.load_from_storage();
+    Ok(())
 }
 
 #[tauri::command]

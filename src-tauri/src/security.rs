@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

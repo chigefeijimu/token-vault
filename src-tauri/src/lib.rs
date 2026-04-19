@@ -21,7 +21,11 @@ pub fn run() {
             // Initialize SQLite storage in app data directory
             let app_data_dir = app.path().app_data_dir()
                 .unwrap_or_else(|_| PathBuf::from("."));
-            let _ = storage::init_storage(app_data_dir);
+            let _ = storage::init_storage(app_data_dir.clone());
+
+            // Load existing wallets from SQLite into WalletManager
+            let _ = wallet::wallet_manager_from_storage();
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
