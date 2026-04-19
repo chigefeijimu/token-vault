@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { CHAINS } from "../types/wallet"
 import { useTransactionStoreData } from "../hooks/useTransactionHistory"
+import { usePendingTxStore } from "../stores/pendingTxStore"
 import type { TransactionRecord } from "../types/transaction"
 import { TransactionStatusBadge } from "./TransactionStatusBadge"
 
@@ -48,6 +49,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   const [submittedAddress, setSubmittedAddress] = useState(initialAddress)
 
   const { pendingTransactions } = useTransactionStoreData(submittedAddress, selectedChain)
+  const pendingTxsByChain = usePendingTxStore((s) => s.getPendingTxsByChain(selectedChain))
 
   const chain = CHAINS.find(c => c.id === selectedChain) ?? CHAINS[0]
   const symbol = chain.symbol
@@ -116,6 +118,22 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     ...pendingTransactions.filter(
       p => p.chainId === selectedChain && p.status === "pending"
     ),
+    ...pendingTxsByChain.map((tx): TransactionRecord => ({
+      hash: tx.hash,
+      blockNumber: 0,
+      blockHash: '',
+      timestamp: tx.timestamp,
+      from: tx.from,
+      to: tx.to,
+      value: tx.amount,
+      valueFormatted: tx.amount,
+      gasUsed: '0',
+      gasPrice: '0',
+      fee: '0',
+      feeFormatted: '0',
+      status: tx.status,
+      chainId: tx.chainId,
+    })),
   ]
 
   return (

@@ -6,6 +6,7 @@ import { NFTGallery } from "../components/NFTGallery"
 import { CHAINS } from "../types/wallet"
 import { useWalletStore } from "../stores/walletStore"
 import { useTokenPrice } from "../hooks/useTokenPrice"
+import { usePendingTxPolling } from "../hooks/usePendingTxPolling"
 
 type Tab = "tokens" | "transactions" | "nfts"
 
@@ -14,6 +15,9 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("tokens")
   const [selectedWalletId, setSelectedWalletId] = useState<string>("")
   const navigate = useNavigate()
+
+  // Activate transaction status polling
+  usePendingTxPolling()
 
   const { wallets, selectedChain } = useWalletStore()
   const selectedWallet = wallets.find(w => w.id === selectedWalletId)

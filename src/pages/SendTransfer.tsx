@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useWalletStore } from "../stores/walletStore";
+import { usePendingTxStore } from "../stores/pendingTxStore";
 import { CHAINS } from "../types/wallet";
 
 export function SendTransfer() {
   const { wallets } = useWalletStore();
+  const addPendingTx = usePendingTxStore((s) => s.addPendingTx);
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -94,6 +96,13 @@ export function SendTransfer() {
         });
       }
       setTxHash(result.tx_hash);
+      addPendingTx(
+        result.tx_hash,
+        chainId,
+        selectedWallet.address,
+        recipient,
+        amount
+      );
       setStep("success");
     } catch (e: unknown) {
       setError(String(e));
