@@ -176,7 +176,6 @@ export function useSavedAddresses(): UseSavedAddressesReturn {
     error,
     fetchAddresses,
     fetchByChain,
-    fetchByChain,
     fetchFavorites,
     search,
     add,

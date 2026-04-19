@@ -3,6 +3,7 @@
 
 use crate::crypto;
 use thiserror::Error;
+use ethers::types::U256;
 
 #[derive(Error, Debug)]
 pub enum TransactionError {
@@ -125,9 +126,6 @@ pub fn encode_signed_transaction(
     let encoded = format!("0x{}", _tx_data);
     Ok(encoded)
 }
-
-// Use U256 from ethers
-use ethers::types::U256;
 
 // Tauri command: send ETH transaction
 #[tauri::command]

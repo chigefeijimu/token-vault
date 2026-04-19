@@ -45,7 +45,7 @@ export function ExportModal({ walletId, onClose }: ExportModalProps) {
     
     try {
       if (format === 'mnemonic') {
-        const mnemonic = await exportMnemonic(wallet.encryptedMnemonic, password)
+        const mnemonic = await exportMnemonic(wallet.encryptedMnemonic!, password)
         setExportedData(mnemonic)
       } else if (format === 'keystore') {
         const { encryptedPrivateKey } = wallet

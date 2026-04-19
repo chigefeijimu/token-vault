@@ -17,7 +17,7 @@ interface WalletStore {
 
   setSelectedChain: (chainId: number) => void
   createWallet: (name: string, password: string) => Promise<{ success: boolean; mnemonic?: string; error?: string }>
-  importWallet: (name: string, password: string, value: string, type: 'mnemonic' | 'privateKey') => Promise<{ success: boolean; error?: string }>
+  importWallet: (name: string, password: string, value: string, type: 'mnemonic' | 'privateKey') => Promise<{ success: boolean; address?: string; error?: string }>
   deleteWallet: (id: string) => Promise<void>
   getWallet: (id: string) => WalletData | undefined
   fetchBalance: (address: string) => Promise<void>
@@ -59,7 +59,7 @@ export const useWalletStore = create<WalletStore>()(
 
       importWallet: async (name, password, value, type) => {
         try {
-          const result = await window.__TAURI__.core.invoke<{ id: string }>('import_wallet', {
+          const result = await window.__TAURI__.core.invoke<{ id: string; address: string }>('import_wallet', {
             name,
             password,
             mnemonic: type === 'mnemonic' ? value : null,
@@ -68,12 +68,12 @@ export const useWalletStore = create<WalletStore>()(
           const walletData: WalletData = {
             id: result.id,
             name,
-            address: '',
+            address: result.address,
             createdAt: Date.now(),
           }
           const wallets = get().wallets
           set({ wallets: [...wallets, walletData] })
-          return { success: true }
+          return { success: true, address: result.address }
         } catch (e) {
           return { success: false, error: String(e) }
         }

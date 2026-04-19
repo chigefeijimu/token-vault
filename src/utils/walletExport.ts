@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { KeystoreExport, ImportResult, ExportedWallet } from '../types/export'
+import type { KeystoreExport, ImportResult } from '../types/export'
 
 /**
  * Export wallet as keystore (JSON format)

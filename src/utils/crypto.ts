@@ -43,3 +43,24 @@ export async function hashPassword(password: string): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
+/**
+ * Derive public key from private key
+ */
+export async function derivePublicKey(privateKey: string): Promise<string> {
+  try {
+    return await invoke<string>('derive_public_key', { privateKey })
+  } catch (e) {
+    throw new CryptoError(`Failed to derive public key: ${e}`)
+  }
+}
+
+/**
+ * Convert public key to Ethereum address
+ */
+export async function publicKeyToAddress(publicKey: string): Promise<string> {
+  try {
+    return await invoke<string>('public_key_to_address', { publicKey })
+  } catch (e) {
+    throw new CryptoError(`Failed to convert public key to address: ${e}`)
+  }
+}

@@ -52,3 +52,36 @@ export interface WalletData {
   encryptedMnemonic?: string
   encryptedPrivateKey?: string
 }
+
+// Saved address types
+export interface SavedAddress {
+  id: string
+  name: string
+  address: string
+  chainId: number
+  isFavorite: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SavedAddressInput {
+  name: string
+  address: string
+  chainId: number
+  isFavorite?: boolean
+}
+
+export interface SavedAddressUpdate {
+  id: string
+  name?: string
+  address?: string
+  chainId?: number
+  isFavorite?: boolean
+}
+
+export interface AddressValidationResult {
+  isValid: boolean
+  address: string
+  chainId?: number
+  error?: string
+}

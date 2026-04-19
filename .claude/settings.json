@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      {
+        "tool": "Write",
+        "path": "**"
+      },
+      {
+        "tool": "Read",
+        "path": "**"
+      },
+      {
+        "tool": "Bash",
+        "command": "**"
+      }
+    ]
+  }
+}

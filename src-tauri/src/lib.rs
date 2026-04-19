@@ -2,6 +2,8 @@ mod crypto;
 mod wallet;
 mod rpc;
 mod transaction;
+mod lib_status;
+mod version;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,6 +35,8 @@ pub fn run() {
             // Transaction commands
             transaction::send_transaction,
             transaction::send_erc20_token,
+            // Version command
+            version::get_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

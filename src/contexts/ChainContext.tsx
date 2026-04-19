@@ -41,6 +41,7 @@ export const ChainProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isCustomRpc, setIsCustomRpc] = useState(false);
 
   const _allChains = [...CHAINS, ...customChains];
+  void _allChains; // suppress unused warning
 
   const switchToMainnet = useCallback((chainId: number) => {
     const chain = CHAINS.find(c => c.id === chainId);

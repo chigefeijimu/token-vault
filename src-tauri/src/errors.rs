@@ -229,57 +229,47 @@ pub mod validation_codes {
 }
 
 // Convert from CryptoError to AppError
-#[cfg(feature = "crypto")]
 impl From<crate::crypto::CryptoError> for AppError {
     fn from(err: crate::crypto::CryptoError) -> Self {
         use crate::crypto::CryptoError;
         let (code, message) = match err {
             CryptoError::EncryptionFailed(msg) => (crypto_codes::ENCRYPTION_FAILED, msg),
             CryptoError::DecryptionFailed(msg) => (crypto_codes::DECRYPTION_FAILED, msg),
-            CryptoError::InvalidKey(msg) => (crypto_codes::INVALID_KEY, msg),
-            CryptoError::KeyDerivationFailed(msg) => (crypto_codes::KEY_DERIVATION_FAILED, msg),
-            CryptoError::MnemonicGenerationFailed(msg) => (crypto_codes::MNEMONIC_GENERATION_FAILED, msg),
-            CryptoError::InvalidMnemonic(msg) => (crypto_codes::INVALID_MNEMONIC, msg),
-            CryptoError::PrivateKeyInvalid(msg) => (crypto_codes::PRIVATE_KEY_INVALID, msg),
-            CryptoError::SignatureFailed(msg) => (crypto_codes::SIGNATURE_FAILED, msg),
+            CryptoError::InvalidData(msg) => (crypto_codes::INVALID_KEY, msg),
+            CryptoError::MnemonicError(msg) => (crypto_codes::INVALID_MNEMONIC, msg),
         };
         Self::Crypto { code, message }
     }
 }
 
 // Convert from WalletError to AppError
-#[cfg(feature = "wallet")]
 impl From<crate::wallet::WalletError> for AppError {
     fn from(err: crate::wallet::WalletError) -> Self {
         use crate::wallet::WalletError;
         let (code, message) = match err {
-            WalletError::NotFound(msg) => (wallet_codes::NOT_FOUND, msg),
-            WalletError::AlreadyExists(msg) => (wallet_codes::ALREADY_EXISTS, msg),
-            WalletError::InvalidAddress(msg) => (wallet_codes::INVALID_ADDRESS, msg),
-            WalletError::ChainNotSupported(msg) => (wallet_codes::CHAIN_NOT_SUPPORTED, msg),
-            WalletError::BalanceFetchFailed(msg) => (wallet_codes::BALANCE_FETCH_FAILED, msg),
-            WalletError::EncryptionFailed(msg) => (wallet_codes::ENCRYPTION_FAILED, msg),
-            WalletError::DecryptionFailed(msg) => (wallet_codes::DECRYPTION_FAILED, msg),
-            WalletError::InvalidPassword(msg) => (wallet_codes::INVALID_PASSWORD, msg),
+            WalletError::NotFound(msg) => (wallet_codes::NOT_FOUND, msg.to_string()),
+            WalletError::InvalidPassword => (wallet_codes::INVALID_PASSWORD, "Invalid password".to_string()),
+            WalletError::AlreadyExists => (wallet_codes::ALREADY_EXISTS, "Wallet already exists".to_string()),
+            WalletError::Crypto(msg) => {
+                return Self::Crypto {
+                    code: crypto_codes::ENCRYPTION_FAILED,
+                    message: msg.to_string(),
+                };
+            }
         };
         Self::Wallet { code, message }
     }
 }
 
 // Convert from TransactionError to AppError
-#[cfg(feature = "transaction")]
 impl From<crate::transaction::TransactionError> for AppError {
     fn from(err: crate::transaction::TransactionError) -> Self {
         use crate::transaction::TransactionError;
         let (code, message) = match err {
             TransactionError::Signing(msg) => (transaction_codes::SIGNING_FAILED, msg),
             TransactionError::Rpc(msg) => (transaction_codes::BROADCAST_FAILED, msg),
-            TransactionError::InvalidTxData(msg) => (transaction_codes::INVALID_TX_DATA, msg),
-            TransactionError::UnderpricedGas(msg) => (transaction_codes::UNDERPRICED_GAS, msg),
-            TransactionError::NonceTooLow(msg) => (transaction_codes::NONCE_TOO_LOW, msg),
-            TransactionError::ReplacementUnderpriced(msg) => (transaction_codes::REPLACEMENT_UNDERPRICED, msg),
-            TransactionError::TxRejected(msg) => (transaction_codes::TX_REJECTED, msg),
-            TransactionError::TxTimeout(msg) => (transaction_codes::TX_TIMEOUT, msg),
+            TransactionError::WalletNotFound(msg) => (wallet_codes::NOT_FOUND, msg),
+            TransactionError::InvalidAddress(msg) => (wallet_codes::INVALID_ADDRESS, msg),
         };
         Self::Transaction { code, message }
     }

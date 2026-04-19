@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import type { AuthState, SecuritySettings, DEFAULT_SECURITY_SETTINGS } from '../types/security';
+import type { AuthState, SecuritySettings } from '../types/security';
 
 const DEFAULT_SETTINGS: SecuritySettings = {
   isAppLockEnabled: false,

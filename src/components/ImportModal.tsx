@@ -20,7 +20,7 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
   const [loading, setLoading] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const addWallet = useWalletStore(state => state.addWallet)
+  const importWallet = useWalletStore(state => state.importWallet)
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -28,13 +28,8 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
     
     try {
       const content = await readFileAsText(file)
-      
-      if (format === 'keystore') {
-        setData(content)
-      } else {
-        setData(content)
-      }
-    } catch (e) {
+      setData(content)
+    } catch {
       setError('Failed to read file')
     }
   }
@@ -60,8 +55,6 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
     setLoading(true)
     
     try {
-      let importResult: { privateKey: string; address: string; encryptedMnemonic?: string }
-      
       if (format === 'keystore') {
         // Validate keystore JSON
         try {
@@ -75,7 +68,12 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
           return
         }
         
-        importResult = await importFromKeystore(data, password)
+        const result = await importFromKeystore(data, password)
+        await importWallet(walletName.trim(), password, result.privateKey, 'privateKey')
+        onSuccess({
+          address: result.address,
+          name: walletName.trim()
+        })
       } else if (format === 'mnemonic') {
         const cleanedData = data.trim()
         if (!validateMnemonic(cleanedData)) {
@@ -84,7 +82,12 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
           return
         }
         
-        importResult = await importFromMnemonic(cleanedData, password)
+        const result = await importFromMnemonic(cleanedData, password)
+        await importWallet(walletName.trim(), password, cleanedData, 'mnemonic')
+        onSuccess({
+          address: result.address,
+          name: walletName.trim()
+        })
       } else {
         const cleanedData = data.trim().replace(/^0x/, '')
         if (!validatePrivateKey(cleanedData)) {
@@ -93,32 +96,17 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
           return
         }
         
-        // Encrypt private key for storage
-        const { encryptData } = await import('../utils/crypto')
-        const encryptedPrivateKey = await encryptData(cleanedData, password)
-        
-        // Derive address from private key
-        const { deriveAddressFromPrivateKey } = await import('../utils/crypto')
-        const address = await deriveAddressFromPrivateKey(cleanedData)
-        
-        importResult = {
-          privateKey: cleanedData,
-          address
-        }
+        await importWallet(walletName.trim(), password, cleanedData, 'privateKey')
+        // Derive address from private key for callback
+        const { derivePublicKey } = await import('../utils/crypto')
+        const publicKey = await derivePublicKey(cleanedData)
+        const { publicKeyToAddress } = await import('../utils/crypto')
+        const address = await publicKeyToAddress(publicKey)
+        onSuccess({
+          address,
+          name: walletName.trim()
+        })
       }
-      
-      // Add wallet to store
-      const walletId = await addWallet({
-        name: walletName.trim(),
-        address: importResult.address,
-        encryptedPrivateKey: await encryptPrivateKeyForStorage(importResult.privateKey),
-        encryptedMnemonic: importResult.encryptedMnemonic
-      })
-      
-      onSuccess({
-        address: importResult.address,
-        name: walletName.trim()
-      })
       
       onClose()
     } catch (e) {
@@ -126,11 +114,6 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
     } finally {
       setLoading(false)
     }
-  }
-  
-  const encryptPrivateKeyForStorage = async (privateKey: string): Promise<string> => {
-    const { encryptData } = await import('../utils/crypto')
-    return await encryptData(privateKey, password)
   }
   
   return (
