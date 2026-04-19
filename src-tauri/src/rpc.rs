@@ -1,3 +1,5 @@
+use ethers::middleware::Middleware;
+use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -227,9 +229,9 @@ pub async fn get_transaction_history(
 
         // Get receipt for each tx to get gas_used, status, etc.
         let (gas_used, gas_price, status, block) = if !tx_hash.is_empty() {
-            match provider.get_transaction_receipt(tx_hash.parse().unwrap_or_default()).await {
+            match provider.get_transaction_receipt(tx_hash.parse::<H256>().unwrap_or_default()).await {
                 Ok(Some(receipt)) => {
-                    let gas_used = format!("0x{:x}", receipt.gas_used);
+                    let gas_used = receipt.gas_used.map(|g| format!("0x{:x}", g)).unwrap_or_default();
                     let gas_price = receipt.effective_gas_price.map(|p| format!("0x{:x}", p)).unwrap_or_else(|| "0x0".to_string());
                     let status = if receipt.status.map(|s| s.as_u64() == 1).unwrap_or(false) {
                         "0x1".to_string()
@@ -246,7 +248,7 @@ pub async fn get_transaction_history(
         };
 
         let block_hash = log.block_hash.map(|h| format!("{:?}", h)).unwrap_or_default();
-        let tx_index = log.transaction_index.map(|i| i.as_u64()).unwrap_or(0);
+        let _tx_index = log.transaction_index.map(|i| i.as_u64()).unwrap_or(0);
 
         let timestamp = if block > 0 {
             match provider.get_block(block).await {
