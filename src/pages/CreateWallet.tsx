@@ -34,6 +34,8 @@ export function CreateWallet() {
       });
       setWallet(result);
       setStep("created");
+      // Navigate to backup page so user can save mnemonic
+      navigate(`/backup/${result.id}`);
     } catch (e: unknown) {
       setError(String(e));
     } finally {
