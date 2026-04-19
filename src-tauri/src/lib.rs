@@ -32,6 +32,7 @@ pub fn run() {
             rpc::estimate_gas,
             rpc::send_raw_transaction,
             rpc::get_transaction_receipt,
+            rpc::get_transaction_history,
             // Transaction commands
             transaction::send_transaction,
             transaction::send_erc20_token,

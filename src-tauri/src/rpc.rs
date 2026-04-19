@@ -165,3 +165,128 @@ pub async fn get_transaction_receipt(
 ) -> Result<Option<TransactionInfo>, String> {
     Ok(None)
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TxHistoryItem {
+    pub transaction_hash: String,
+    pub block_number: u64,
+    pub block_hash: String,
+    pub timestamp: u64,
+    pub from: String,
+    pub to: String,
+    pub value: String,
+    pub gas_used: String,
+    pub gas_price: String,
+    pub status: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct TxHistoryResult {
+    pub transactions: Vec<TxHistoryItem>,
+    pub total_count: usize,
+    pub has_more: bool,
+}
+
+#[tauri::command]
+pub async fn get_transaction_history(
+    address: String,
+    chain_id: u64,
+    page: u32,
+    page_size: u32,
+) -> Result<TxHistoryResult, String> {
+    use ethers::providers::{Provider, Http};
+    use std::str::FromStr;
+
+    let client = RpcClient::new();
+    let config = client.get_chain_config(chain_id)
+        .ok_or_else(|| format!("Unsupported chain: {}", chain_id))?;
+
+    let rpc_url = &config.rpc_url;
+    let provider = Provider::<Http>::try_from(rpc_url.as_str())
+        .map_err(|e| format!("Failed to connect to RPC: {}", e))?;
+
+    let addr = ethers::types::Address::from_str(&address)
+        .map_err(|e| format!("Invalid address: {}", e))?;
+
+    let start_block = ethers::types::U64::from(0);
+    let end_block = ethers::types::U64::from(u64::MAX);
+
+    let filter = ethers::types::Filter::new()
+        .from_block(start_block)
+        .to_block(end_block)
+        .address(addr);
+
+    let logs = provider.get_logs(&filter)
+        .await
+        .map_err(|e| format!("Failed to fetch logs: {}", e))?;
+
+    let mut txs: Vec<TxHistoryItem> = Vec::new();
+
+    for log in logs {
+        let tx_hash = log.transaction_hash.map(|h| format!("{:?}", h)).unwrap_or_default();
+
+        // Get receipt for each tx to get gas_used, status, etc.
+        let (gas_used, gas_price, status, block) = if !tx_hash.is_empty() {
+            match provider.get_transaction_receipt(tx_hash.parse().unwrap_or_default()).await {
+                Ok(Some(receipt)) => {
+                    let gas_used = format!("0x{:x}", receipt.gas_used);
+                    let gas_price = receipt.effective_gas_price.map(|p| format!("0x{:x}", p)).unwrap_or_else(|| "0x0".to_string());
+                    let status = if receipt.status.map(|s| s.as_u64() == 1).unwrap_or(false) {
+                        "0x1".to_string()
+                    } else {
+                        "0x0".to_string()
+                    };
+                    let block_num = receipt.block_number.map(|b| b.as_u64()).unwrap_or(0);
+                    (gas_used, gas_price, status, block_num)
+                }
+                _ => ("0x0".to_string(), "0x0".to_string(), "0x1".to_string(), 0),
+            }
+        } else {
+            ("0x0".to_string(), "0x0".to_string(), "0x1".to_string(), 0)
+        };
+
+        let block_hash = log.block_hash.map(|h| format!("{:?}", h)).unwrap_or_default();
+        let tx_index = log.transaction_index.map(|i| i.as_u64()).unwrap_or(0);
+
+        let timestamp = if block > 0 {
+            match provider.get_block(block).await {
+                Ok(Some(b)) => b.timestamp.as_u64(),
+                _ => 0,
+            }
+        } else {
+            0
+        };
+
+        txs.push(TxHistoryItem {
+            transaction_hash: tx_hash,
+            block_number: block,
+            block_hash,
+            timestamp,
+            from: log.address.to_string(),
+            to: String::new(),
+            value: "0x0".to_string(),
+            gas_used,
+            gas_price,
+            status,
+        });
+    }
+
+    // Sort by block number descending (newest first)
+    txs.sort_by(|a, b| b.block_number.cmp(&a.block_number));
+
+    let total_count = txs.len();
+    let start = (page as usize).saturating_mul(page_size as usize);
+    let end = (start + page_size as usize).min(total_count);
+
+    let page_txs: Vec<TxHistoryItem> = if start < total_count {
+        txs[start..end].to_vec()
+    } else {
+        Vec::new()
+    };
+
+    Ok(TxHistoryResult {
+        transactions: page_txs,
+        total_count,
+        has_more: end < total_count,
+    })
+}
