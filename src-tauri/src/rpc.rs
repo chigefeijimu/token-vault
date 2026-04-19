@@ -178,33 +178,158 @@ pub async fn get_chain_config(chain_id: u64) -> Result<ChainConfig, String> {
 
 #[tauri::command]
 pub async fn get_balance(address: String, chain_id: u64) -> Result<BalanceInfo, String> {
-    RpcClient::new()
-        .get_native_balance(&address, chain_id)
-        .ok_or_else(|| format!("Failed to get balance for chain {}", chain_id))
+    let rpc_url = match chain_id {
+        1 => "https://eth.llamarpc.com",
+        56 => "https://bsc-dataseed.binance.org",
+        137 => "https://polygon-rpc.com",
+        42161 => "https://arb1.arbitrum.io/rpc",
+        10 => "https://mainnet.optimism.io",
+        43114 => "https://api.avax.network/ext/bc/C/rpc",
+        _ => return Err(format!("Unsupported chain: {}", chain_id)),
+    };
+
+    let client = reqwest::Client::new();
+    let params = serde_json::json!([
+        {"jsonrpc": "2.0", "method": "eth_getBalance", "params": [&address, "latest"], "id": 1}
+    ]);
+
+    let resp = client
+        .post(rpc_url)
+        .json(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))?;
+
+    let balance_hex = json["result"]
+        .as_str()
+        .ok_or("Invalid balance response")?;
+
+    let balance_u128: u128 = u128::from_str_radix(balance_hex.trim_start_matches("0x"), 16)
+        .map_err(|_| "Invalid balance hex")?;
+
+    let symbol = match chain_id {
+        1 => "ETH",
+        56 => "BNB",
+        137 => "MATIC",
+        42161 => "ETH",
+        10 => "ETH",
+        43114 => "AVAX",
+        _ => "ETH",
+    };
+
+    Ok(BalanceInfo {
+        address,
+        balance: balance_u128.to_string(),
+        symbol: symbol.to_string(),
+        decimals: 18,
+    })
 }
 
 #[tauri::command]
 pub async fn get_gas_price(chain_id: u64) -> Result<GasPriceInfo, String> {
-    // Stub implementation - returns mock gas price
+    let rpc_url = match chain_id {
+        1 => "https://eth.llamarpc.com",
+        56 => "https://bsc-dataseed.binance.org",
+        137 => "https://polygon-rpc.com",
+        42161 => "https://arb1.arbitrum.io/rpc",
+        10 => "https://mainnet.optimism.io",
+        43114 => "https://api.avax.network/ext/bc/C/rpc",
+        _ => return Err(format!("Unsupported chain: {}", chain_id)),
+    };
+
+    let client = reqwest::Client::new();
+    let params = serde_json::json!([
+        {"jsonrpc": "2.0", "method": "eth_gasPrice", "params": [], "id": 1}
+    ]);
+
+    let resp = client
+        .post(rpc_url)
+        .json(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))?;
+
+    let gas_price_hex = json["result"]
+        .as_str()
+        .ok_or("Invalid gas price response")?;
+
+    let gas_price_u128: u128 = u128::from_str_radix(gas_price_hex.trim_start_matches("0x"), 16)
+        .map_err(|_| "Invalid gas price hex")?;
+
+    // Calculate slow/standard/fast based on the base gas price
+    let slow = gas_price_u128 * 80 / 100;  // 80%
+    let standard = gas_price_u128;          // 100%
+    let fast = gas_price_u128 * 120 / 100; // 120%
+
     Ok(GasPriceInfo {
-        slow: "0x4A817C800".to_string(),   // 20 Gwei
-        standard: "0x6FCF23C00".to_string(), // 33 Gwei
-        fast: "0x9502F900".to_string(),    // 40 Gwei
+        slow: format!("0x{:x}", slow),
+        standard: format!("0x{:x}", standard),
+        fast: format!("0x{:x}", fast),
         unit: "wei".to_string(),
     })
 }
 
 #[tauri::command]
 pub async fn estimate_gas(
-    _from: String,
-    _to: String,
-    _value: String,
-    _data: Option<String>,
-    _chain_id: u64,
+    from: String,
+    to: String,
+    value: String,
+    data: Option<String>,
+    chain_id: u64,
 ) -> Result<GasEstimateResult, String> {
-    // Stub: return a safe default gas limit
+    let rpc_url = match chain_id {
+        1 => "https://eth.llamarpc.com",
+        56 => "https://bsc-dataseed.binance.org",
+        137 => "https://polygon-rpc.com",
+        42161 => "https://arb1.arbitrum.io/rpc",
+        10 => "https://mainnet.optimism.io",
+        43114 => "https://api.avax.network/ext/bc/C/rpc",
+        _ => return Err(format!("Unsupported chain: {}", chain_id)),
+    };
+
+    let client = reqwest::Client::new();
+    let params = serde_json::json!([
+        {
+            "jsonrpc": "2.0",
+            "method": "eth_estimateGas",
+            "params": [{
+                "from": &from,
+                "to": &to,
+                "value": &value,
+                "data": data.as_deref().unwrap_or("0x")
+            }],
+            "id": 1
+        }
+    ]);
+
+    let resp = client
+        .post(rpc_url)
+        .json(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))?;
+
+    let gas_hex = json["result"]
+        .as_str()
+        .ok_or("Invalid gas estimate response")?;
+
     Ok(GasEstimateResult {
-        gas_limit: "0x5208".to_string(), // 21000 gas (standard ETH transfer)
+        gas_limit: gas_hex.to_string(),
     })
 }
 
@@ -242,15 +367,168 @@ pub async fn get_transaction_receipt(
 
 #[tauri::command]
 pub async fn get_transaction_history(
-    _address: String,
-    _chain_id: u64,
-    _page: u32,
-    _page_size: u32,
+    address: String,
+    chain_id: u64,
+    page: u32,
+    page_size: u32,
 ) -> Result<TxHistoryResult, String> {
-    // Stub: return empty history
+    let rpc_url = match chain_id {
+        1 => "https://eth.llamarpc.com",
+        56 => "https://bsc-dataseed.binance.org",
+        137 => "https://polygon-rpc.com",
+        42161 => "https://arb1.arbitrum.io/rpc",
+        10 => "https://mainnet.optimism.io",
+        43114 => "https://api.avax.network/ext/bc/C/rpc",
+        _ => return Err(format!("Unsupported chain: {}", chain_id)),
+    };
+
+    let client = reqwest::Client::new();
+
+    // Calculate block range for pagination
+    // Get latest block first
+    let latest_params = serde_json::json!([
+        {"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1}
+    ]);
+    let latest_resp = client
+        .post(rpc_url)
+        .json(&latest_params)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    let latest_json: serde_json::Value = latest_resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))?;
+    let latest_block_hex = latest_json["result"].as_str().unwrap_or("0x0");
+    let latest_block: u64 = u64::from_str_radix(latest_block_hex.trim_start_matches("0x"), 16)
+        .unwrap_or(0);
+
+    // Calculate from block (go back ~10000 blocks per page to get enough tx)
+    let blocks_per_page = 10000u64;
+    let from_block = if latest_block > page as u64 * blocks_per_page {
+        latest_block - (page as u64 * blocks_per_page)
+    } else {
+        0
+    };
+
+    // Use eth_getLogs to get logs involving this address
+    let logs_params = serde_json::json!([
+        {
+            "jsonrpc": "2.0",
+            "method": "eth_getLogs",
+            "params": [{
+                "fromBlock": format!("0x{:x}", from_block),
+                "toBlock": latest_block_hex,
+                "address": &address,
+                "topics": [],
+                "offset": (page as u64 * blocks_per_page),
+                "limit": page_size
+            }],
+            "id": 1
+        }
+    ]);
+
+    let logs_resp = client
+        .post(rpc_url)
+        .json(&logs_params)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let logs_json: serde_json::Value = logs_resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))?;
+
+    let logs = logs_json["result"].as_array().map(|a| a.clone()).unwrap_or_default();
+
+    // Convert logs to TxHistoryItems
+    let mut transactions: Vec<TxHistoryItem> = Vec::new();
+
+    for log in logs {
+        let tx_hash = log["transactionHash"].as_str().unwrap_or("").to_string();
+        let block_number = log["blockNumber"].as_str().unwrap_or("0x0");
+        let block_num: u64 = u64::from_str_radix(block_number.trim_start_matches("0x"), 16).unwrap_or(0);
+        let log_index = log["logIndex"].as_u64().unwrap_or(0) as usize;
+
+        // Get block timestamp
+        let block_params = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": [block_number, false], "id": 1}
+        ]);
+        let block_resp = client
+            .post(rpc_url)
+            .json(&block_params)
+            .send()
+            .await;
+        let timestamp = if let Ok(resp) = block_resp {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                json["result"]["timestamp"]
+                    .as_str()
+                    .map(|s| {
+                        u64::from_str_radix(s.trim_start_matches("0x"), 16).unwrap_or(0)
+                    })
+                    .unwrap_or(0)
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        // Get transaction receipt for more details
+        let receipt_params = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "eth_getTransactionReceipt", "params": [&tx_hash], "id": 1}
+        ]);
+        let receipt_resp = client
+            .post(rpc_url)
+            .json(&receipt_params)
+            .send()
+            .await;
+        let (from, to, value, gas_used, gas_price, status) = if let Ok(resp) = receipt_resp {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                let result = &json["result"];
+                let from = result["from"].as_str().unwrap_or("").to_string();
+                let to = result["to"].as_str().unwrap_or("").to_string();
+                let value = result["value"].as_str().unwrap_or("0x0").to_string();
+                let gas_used = result["gasUsed"].as_str().unwrap_or("0x0").to_string();
+                let gas_price = result["effectiveGasPrice"].as_str().unwrap_or("0x0").to_string();
+                let status = result["status"].as_str().unwrap_or("0x1").to_string();
+                (from, to, value, gas_used, gas_price, status)
+            } else {
+                (String::new(), String::new(), "0x0".to_string(), "0x0".to_string(), "0x0".to_string(), "0x1".to_string())
+            }
+        } else {
+            (String::new(), String::new(), "0x0".to_string(), "0x0".to_string(), "0x0".to_string(), "0x1".to_string())
+        };
+
+        let block_hash = log["blockHash"].as_str().unwrap_or("").to_string();
+
+        transactions.push(TxHistoryItem {
+            transaction_hash: tx_hash,
+            block_number: block_num,
+            block_hash,
+            timestamp,
+            from,
+            to,
+            value,
+            gas_used,
+            gas_price,
+            status,
+        });
+    }
+
+    // Sort by block number descending (newest first)
+    transactions.sort_by(|a, b| b.block_number.cmp(&a.block_number));
+
+    // Limit to page_size
+    transactions.truncate(page_size as usize);
+
+    let has_more = transactions.len() as u32 == page_size;
+    let total_count = transactions.len();
+
     Ok(TxHistoryResult {
-        transactions: vec![],
-        total_count: 0,
-        has_more: false,
+        transactions,
+        total_count,
+        has_more,
     })
 }
