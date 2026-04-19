@@ -34,7 +34,7 @@ export function Dashboard() {
             Token prices, market data, and transaction history
           </p>
         </div>
-        {/* Chain selector */}
+        {/* Chain selector + Settings */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Chain:</span>
           <select
@@ -46,6 +46,12 @@ export function Dashboard() {
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+          <button
+            onClick={() => navigate("/settings")}
+            className="px-3 py-1.5 bg-vault-border text-vault-text rounded-lg text-sm hover:bg-vault-bg transition"
+          >
+            Settings
+          </button>
         </div>
       </div>
 
