@@ -5,6 +5,7 @@ import { ImportWallet } from "./pages/ImportWallet";
 import { Settings } from "./pages/Settings";
 import { WalletDashboard } from "./pages/WalletDashboard";
 import { WalletDetails } from "./pages/WalletDetails";
+import { SendTransfer } from "./pages/SendTransfer";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
       <Route path="/settings" element={<Settings />} />
       <Route path="/wallet" element={<WalletDashboard />} />
       <Route path="/wallet/:id" element={<WalletDetails />} />
+      <Route path="/send" element={<SendTransfer />} />
     </Routes>
   );
 }

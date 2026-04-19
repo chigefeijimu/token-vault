@@ -47,6 +47,12 @@ export function Dashboard() {
             ))}
           </select>
           <button
+            onClick={() => navigate("/send")}
+            className="px-3 py-1.5 bg-vault-gradient text-white rounded-lg text-sm font-medium hover:opacity-90 transition"
+          >
+            Send
+          </button>
+          <button
             onClick={() => navigate("/settings")}
             className="px-3 py-1.5 bg-vault-border text-vault-text rounded-lg text-sm hover:bg-vault-bg transition"
           >
