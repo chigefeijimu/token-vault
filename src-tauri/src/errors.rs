@@ -190,7 +190,7 @@ pub mod rpc_codes {
     pub const INVALID_RESPONSE: u32 = 4002;
     pub const CHAIN_ID_MISMATCH: u32 = 4003;
     pub const BLOCK_NOT_FOUND: u32 = 4004;
-    pub const GAS_estimation_FAILED: u32 = 4005;
+    pub const GAS_ESTIMATION_FAILED: u32 = 4005;
     pub const METHOD_NOT_FOUND: u32 = 4006;
 }
 

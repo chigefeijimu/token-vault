@@ -13,6 +13,7 @@
     "@headlessui/react": "^2.2.10",
     "@tauri-apps/api": "^2.10.1",
     "@types/react-router-dom": "^5.3.3",
+    "@walletconnect/ethereum-provider": "^2.23.9",
     "clsx": "^2.1.1",
     "lucide-react": "^1.8.0",
     "react": "^18.2.0",

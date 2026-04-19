@@ -1,5 +1,4 @@
-use ethers::providers::Provider;
-use ethers::types::{H160, U256};
+use ethers::types::H160;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
