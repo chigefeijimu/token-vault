@@ -234,17 +234,3 @@ pub fn export_private_key(id: String, password: String) -> Result<String, String
     let manager = WalletManager::new();
     manager.export_private_key(&id, &password).map_err(|e| e.to_string())
 }
-
-#[tauri::command]
-pub async fn send_transaction(
-    wallet_id: String,
-    _to: String,
-    _amount: String,
-    _chain_id: u64,
-) -> Result<String, String> {
-    let manager = WalletManager::new();
-    let _wallet = manager.get_wallet(&wallet_id).ok_or("Wallet not found")?;
-    // Mock tx hash - real implementation would sign and broadcast via RPC
-    let tx_hash = format!("0x{:064x}", rand::random::<u128>());
-    Ok(tx_hash)
-}

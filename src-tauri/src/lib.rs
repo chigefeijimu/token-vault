@@ -1,6 +1,7 @@
 mod crypto;
 mod wallet;
 mod rpc;
+mod transaction;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,13 +24,15 @@ pub fn run() {
             wallet::get_wallet_info,
             wallet::delete_wallet,
             wallet::export_private_key,
-            wallet::send_transaction,
             // RPC commands
             rpc::get_chain_config,
             rpc::get_balance,
             rpc::estimate_gas,
             rpc::send_raw_transaction,
             rpc::get_transaction_receipt,
+            // Transaction commands
+            transaction::send_transaction,
+            transaction::send_erc20_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -27,6 +27,10 @@ ethers = "2"
 chrono = "0.4"
 uuid = { version = "1", features = ["v4"] }
 lazy_static = "1.4"
+k256 = "0.13"
+rlp = "0.5"
+primitive-types = "0.12"
+sha3 = "0.10"
 
 [profile.release]
 panic = "abort"
