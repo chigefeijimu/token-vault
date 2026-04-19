@@ -1,16 +1,13 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Hello Tauri</title>
-</head>
-<body>
-    <h1 id="hello"></h1>
-    <script type="module">
-        const { invoke } = window.__TAURI__.invoke;
-        invoke('hello').then(result => {
-            document.getElementById('hello').textContent = result;
-        });
-    </script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TokenVault</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

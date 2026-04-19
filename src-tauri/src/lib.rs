@@ -1,21 +1,35 @@
+mod crypto;
 mod wallet;
 mod rpc;
-mod crypto;
-
-use tauri::Builder;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    Builder::default()
+    tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            wallet::create_wallet,
-            wallet::get_balance,
-            wallet::send_transaction,
-            rpc::call_rpc,
-            rpc::get_block_number,
+            // Crypto commands
+            crypto::generate_private_key,
+            crypto::derive_public_key,
+            crypto::public_key_to_address,
+            crypto::sign_data,
             crypto::encrypt_data,
             crypto::decrypt_data,
             crypto::hash_data,
+            crypto::validate_mnemonic_cmd,
+            crypto::generate_mnemonic_cmd,
+            // Wallet commands
+            wallet::create_wallet,
+            wallet::import_wallet,
+            wallet::list_wallets,
+            wallet::get_wallet_info,
+            wallet::delete_wallet,
+            wallet::export_private_key,
+            wallet::send_transaction,
+            // RPC commands
+            rpc::get_chain_config,
+            rpc::get_balance,
+            rpc::estimate_gas,
+            rpc::send_raw_transaction,
+            rpc::get_transaction_receipt,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

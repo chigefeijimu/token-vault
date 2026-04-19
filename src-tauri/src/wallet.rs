@@ -44,7 +44,6 @@ impl WalletManager {
         }
     }
 
-    /// Generate a unique ID for a wallet
     fn generate_id() -> String {
         use argon2::password_hash::rand_core::OsRng;
         use argon2::password_hash::rand_core::RngCore;
@@ -53,44 +52,33 @@ impl WalletManager {
         hex::encode(bytes)
     }
 
-    /// Create a new wallet with generated mnemonic
     pub fn create_wallet(&mut self, name: &str, password: &str) -> Result<WalletInfo, WalletError> {
-        // Generate mnemonic
-        let mnemonic = crypto::generate_mnemonic(12)?;
-
-        // Derive private key from mnemonic
+        let mnemonic = crypto::generate_mnemonic();
         let private_key = crypto::derive_private_key_from_mnemonic(&mnemonic, "m/44'/60'/0'/0/0")?;
-
-        // Derive address
-        let address = crypto::derive_eth_address(&private_key)?;
-
-        // Create wallet ID
+        let address = crypto::derive_eth_address(&private_key);
         let id = Self::generate_id();
 
-        // Generate salt and hash the password
         let salt = crypto::generate_salt();
-        let password_hash = crypto::hash_password(password, &salt)?;
+        let password_hash = crypto::hash_password(password, &salt);
 
         let info = WalletInfo {
             id: id.clone(),
             name: name.to_string(),
-            address,
+            address: address.clone(),
             created_at: chrono::Utc::now().to_rfc3339(),
         };
 
-        // Store wallet with encrypted private key
         let wallet = StoredWallet {
             info: info.clone(),
             encrypted_private_key: private_key,
             salt: salt.to_vec(),
-            password_hash: Some(password_hash),
+            password_hash: Some(hex::encode(&password_hash)),
         };
 
         self.wallets.insert(id, wallet);
         Ok(info)
     }
 
-    /// Import wallet from mnemonic phrase
     pub fn import_from_mnemonic(
         &mut self,
         name: &str,
@@ -100,14 +88,12 @@ impl WalletManager {
         if !crypto::validate_mnemonic(mnemonic) {
             return Err(WalletError::NotFound("Invalid mnemonic phrase".into()));
         }
-
         let private_key = crypto::derive_private_key_from_mnemonic(mnemonic, "m/44'/60'/0'/0/0")?;
-        let address = crypto::derive_eth_address(&private_key)?;
+        let address = crypto::derive_eth_address(&private_key);
         let id = Self::generate_id();
 
-        // Generate salt and hash the password
         let salt = crypto::generate_salt();
-        let password_hash = crypto::hash_password(password, &salt)?;
+        let password_hash = crypto::hash_password(password, &salt);
 
         let info = WalletInfo {
             id: id.clone(),
@@ -120,14 +106,13 @@ impl WalletManager {
             info: info.clone(),
             encrypted_private_key: private_key,
             salt: salt.to_vec(),
-            password_hash: Some(password_hash),
+            password_hash: Some(hex::encode(&password_hash)),
         };
 
         self.wallets.insert(id, wallet);
         Ok(info)
     }
 
-    /// Import wallet from private key
     pub fn import_from_private_key(
         &mut self,
         name: &str,
@@ -137,12 +122,11 @@ impl WalletManager {
         let private_key = hex::decode(private_key_hex.trim_start_matches("0x"))
             .map_err(|_| WalletError::NotFound("Invalid private key format".into()))?;
 
-        let address = crypto::derive_eth_address(&private_key)?;
+        let address = crypto::derive_eth_address(&private_key);
         let id = Self::generate_id();
 
-        // Generate salt and hash the password
         let salt = crypto::generate_salt();
-        let password_hash = crypto::hash_password(password, &salt)?;
+        let password_hash = crypto::hash_password(password, &salt);
 
         let info = WalletInfo {
             id: id.clone(),
@@ -155,24 +139,21 @@ impl WalletManager {
             info: info.clone(),
             encrypted_private_key: private_key,
             salt: salt.to_vec(),
-            password_hash: Some(password_hash),
+            password_hash: Some(hex::encode(&password_hash)),
         };
 
         self.wallets.insert(id, wallet);
         Ok(info)
     }
 
-    /// List all wallets
     pub fn list_wallets(&self) -> Vec<WalletInfo> {
         self.wallets.values().map(|w| w.info.clone()).collect()
     }
 
-    /// Get a specific wallet by ID
     pub fn get_wallet(&self, id: &str) -> Option<WalletInfo> {
         self.wallets.get(id).map(|w| w.info.clone())
     }
 
-    /// Delete a wallet by ID
     pub fn delete_wallet(&mut self, id: &str) -> Result<(), WalletError> {
         if self.wallets.remove(id).is_some() {
             Ok(())
@@ -181,7 +162,6 @@ impl WalletManager {
         }
     }
 
-    /// Export private key for a wallet after verifying password
     pub fn export_private_key(
         &self,
         wallet_id: &str,
@@ -190,14 +170,12 @@ impl WalletManager {
         let wallet = self.wallets.get(wallet_id)
             .ok_or_else(|| WalletError::NotFound(format!("Wallet not found: {}", wallet_id)))?;
 
-        // Verify password if a hash exists
         if let Some(ref hash) = wallet.password_hash {
-            if !crypto::verify_password(password, hash) {
+            if !crypto::verify_password(password, &wallet.salt, &hex::decode(hash).unwrap_or_default()) {
                 return Err(WalletError::InvalidPassword);
             }
         }
 
-        // Return private key as hex string with 0x prefix
         Ok(format!("0x{}", hex::encode(&wallet.encrypted_private_key)))
     }
 }
@@ -206,4 +184,67 @@ impl Default for WalletManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ============== Tauri Commands ==============
+
+#[tauri::command]
+pub fn create_wallet(name: String, password: String) -> Result<WalletInfo, String> {
+    let mut manager = WalletManager::new();
+    manager.create_wallet(&name, &password).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_wallet(
+    name: String,
+    password: String,
+    mnemonic: Option<String>,
+    private_key: Option<String>,
+) -> Result<WalletInfo, String> {
+    let mut manager = WalletManager::new();
+    if let Some(mnemonic) = mnemonic {
+        manager.import_from_mnemonic(&name, &mnemonic, &password).map_err(|e| e.to_string())
+    } else if let Some(pk) = private_key {
+        manager.import_from_private_key(&name, &pk, &password).map_err(|e| e.to_string())
+    } else {
+        Err("Either mnemonic or private_key must be provided".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn list_wallets() -> Result<Vec<WalletInfo>, String> {
+    let manager = WalletManager::new();
+    Ok(manager.list_wallets())
+}
+
+#[tauri::command]
+pub fn get_wallet_info(id: String) -> Result<WalletInfo, String> {
+    let manager = WalletManager::new();
+    manager.get_wallet(&id).ok_or_else(|| format!("Wallet not found: {}", id))
+}
+
+#[tauri::command]
+pub fn delete_wallet(id: String) -> Result<(), String> {
+    let mut manager = WalletManager::new();
+    manager.delete_wallet(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn export_private_key(id: String, password: String) -> Result<String, String> {
+    let manager = WalletManager::new();
+    manager.export_private_key(&id, &password).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn send_transaction(
+    wallet_id: String,
+    _to: String,
+    _amount: String,
+    _chain_id: u64,
+) -> Result<String, String> {
+    let manager = WalletManager::new();
+    let _wallet = manager.get_wallet(&wallet_id).ok_or("Wallet not found")?;
+    // Mock tx hash - real implementation would sign and broadcast via RPC
+    let tx_hash = format!("0x{:064x}", rand::random::<u128>());
+    Ok(tx_hash)
 }
