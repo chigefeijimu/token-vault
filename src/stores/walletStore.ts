@@ -43,14 +43,14 @@ export const useWalletStore = create<WalletStore>()(
 
       createWallet: async (name, password) => {
         try {
-          const result = await window.__TAURI__.core.invoke<{ id: string; mnemonic: string }>('create_wallet', {
+          const result = await window.__TAURI__.core.invoke<{ id: string; address: string; name: string; mnemonic: string }>('create_wallet', {
             name,
             password,
           })
           const walletData: WalletData = {
             id: result.id,
-            name,
-            address: '',
+            name: result.name,
+            address: result.address,
             createdAt: Date.now(),
             encryptedMnemonic: undefined,
           }

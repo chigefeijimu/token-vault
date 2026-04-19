@@ -126,6 +126,36 @@ impl Default for RpcClient {
 
 // ============== Tauri Commands ==============
 
+#[derive(Debug, Clone, Serialize)]
+pub struct GasEstimateResult {
+    pub gas_limit: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TransactionReceipt {
+    pub transaction_hash: String,
+    pub block_number: String,
+    pub block_hash: String,
+    pub from: String,
+    pub to: Option<String>,
+    pub cumulative_gas_used: String,
+    pub gas_used: String,
+    pub effective_gas_price: String,
+    pub logs: Vec<TransactionLog>,
+    pub status: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TransactionLog {
+    pub address: String,
+    pub topics: Vec<String>,
+    pub data: String,
+    pub block_number: String,
+    pub transaction_hash: String,
+    pub log_index: usize,
+    pub removed: bool,
+}
+
 #[tauri::command]
 pub async fn get_chain_config(chain_id: u64) -> Result<ChainConfig, String> {
     RpcClient::new()
@@ -141,12 +171,72 @@ pub async fn get_balance(address: String, chain_id: u64) -> Result<BalanceInfo, 
 }
 
 #[tauri::command]
+pub async fn get_gas_price(chain_id: u64) -> Result<GasPriceInfo, String> {
+    use ethers::providers::{Provider, Http};
+
+    let client = RpcClient::new();
+    let config = client.get_chain_config(chain_id)
+        .ok_or_else(|| format!("Unsupported chain: {}", chain_id))?;
+
+    let provider = Provider::<Http>::try_from(config.rpc_url.as_str())
+        .map_err(|e| format!("Failed to connect to RPC: {}", e))?;
+
+    let gas_price = provider.get_gas_price()
+        .await
+        .map_err(|e| format!("Failed to get gas price: {}", e))?;
+
+    let gas_hex = format!("0x{:x}", gas_price);
+
+    Ok(GasPriceInfo {
+        slow: gas_hex.clone(),
+        standard: gas_hex.clone(),
+        fast: gas_hex,
+        unit: "wei".to_string(),
+    })
+}
+
+#[tauri::command]
 pub async fn estimate_gas(
-    _to_address: String,
-    _amount: String,
-    _chain_id: u64,
-) -> Result<String, String> {
-    Ok("21000".to_string())
+    from: String,
+    to: String,
+    value: String,
+    data: Option<String>,
+    chain_id: u64,
+) -> Result<GasEstimateResult, String> {
+    use ethers::providers::{Provider, Http};
+    use std::str::FromStr;
+
+    let client = RpcClient::new();
+    let config = client.get_chain_config(chain_id)
+        .ok_or_else(|| format!("Unsupported chain: {}", chain_id))?;
+
+    let provider = Provider::<Http>::try_from(config.rpc_url.as_str())
+        .map_err(|e| format!("Failed to connect to RPC: {}", e))?;
+
+    let from_addr = ethers::types::Address::from_str(&from)
+        .map_err(|e| format!("Invalid from address: {}", e))?;
+    let to_addr = ethers::types::Address::from_str(&to)
+        .map_err(|e| format!("Invalid to address: {}", e))?;
+    let val = ethers::types::U256::from_str(&value)
+        .map_err(|e| format!("Invalid value: {}", e))?;
+
+    let calldata = data.unwrap_or_else(|| "0x".to_string());
+
+    let request = ethers::types::TransactionRequest {
+        from: Some(from_addr),
+        to: Some(ethers::types::NameOrAddress::Address(to_addr)),
+        value: Some(val),
+        data: Some(ethers::types::Bytes::from_str(&calldata).unwrap_or_default()),
+        ..Default::default()
+    };
+
+    let gas = provider.estimate_gas(&request.into(), None)
+        .await
+        .map_err(|e| format!("Gas estimation failed: {}", e))?;
+
+    Ok(GasEstimateResult {
+        gas_limit: format!("0x{:x}", gas),
+    })
 }
 
 #[tauri::command]
@@ -163,9 +253,63 @@ pub async fn send_raw_transaction(
 
 #[tauri::command]
 pub async fn get_transaction_receipt(
-    _tx_hash: String,
-) -> Result<Option<TransactionInfo>, String> {
-    Ok(None)
+    tx_hash: String,
+    chain_id: u64,
+) -> Result<Option<TransactionReceipt>, String> {
+    use ethers::providers::{Provider, Http};
+    use std::str::FromStr;
+
+    let client = RpcClient::new();
+    let config = client.get_chain_config(chain_id)
+        .ok_or_else(|| format!("Unsupported chain: {}", chain_id))?;
+
+    let provider = Provider::<Http>::try_from(config.rpc_url.as_str())
+        .map_err(|e| format!("Failed to connect to RPC: {}", e))?;
+
+    let tx_hashParsed = H256::from_str(&tx_hash)
+        .map_err(|e| format!("Invalid tx hash: {}", e))?;
+
+    let receipt = provider.get_transaction_receipt(tx_hashParsed)
+        .await
+        .map_err(|e| format!("Failed to get receipt: {}", e))?;
+
+    match receipt {
+        Some(r) => {
+            let status = r.status.map(|s| s.as_u64() == 1).unwrap_or(false);
+            let tx = r.transaction_hash;
+            let block_hash = r.block_hash.map(|h| format!("{:?}", h)).unwrap_or_default();
+            let block_number = r.block_number.map(|b| format!("0x{:x}", b.as_u64())).unwrap_or_default();
+            let cumulative_gas_used = format!("0x{:x}", r.cumulative_gas_used);
+            let gas_used = r.gas_used
+                .map(|g| format!("0x{:x}", g))
+                .unwrap_or_else(|| "0x0".to_string());
+            let effective_gas_price = r.effective_gas_price
+                .map(|p| format!("0x{:x}", p))
+                .unwrap_or_else(|| "0x0".to_string());
+
+            Ok(Some(TransactionReceipt {
+                transaction_hash: format!("{:?}", tx),
+                block_number,
+                block_hash,
+                from: r.from.to_string(),
+                to: r.to.map(|t| t.to_string()),
+                cumulative_gas_used,
+                gas_used,
+                effective_gas_price,
+                logs: r.logs.iter().map(|l| TransactionLog {
+                    address: l.address.to_string(),
+                    topics: l.topics.iter().map(|t| format!("{:?}", t)).collect(),
+                    data: format!("0x{}", hex::encode(&l.data.0)),
+                    block_number: l.block_number.map(|b| format!("0x{:x}", b.as_u64())).unwrap_or_default(),
+                    transaction_hash: l.transaction_hash.map(|h| format!("{:?}", h)).unwrap_or_default(),
+                    log_index: l.log_index.map(|i| i.as_u64() as usize).unwrap_or(0),
+                    removed: l.removed.unwrap_or(false),
+                }).collect(),
+                status,
+            }))
+        }
+        None => Ok(None),
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

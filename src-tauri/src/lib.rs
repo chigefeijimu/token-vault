@@ -6,10 +6,12 @@ mod lib_status;
 mod version;
 mod nft;
 mod erc20;
+mod security;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(security::SecurityManager::new())
         .invoke_handler(tauri::generate_handler![
             // Crypto commands
             crypto::generate_private_key,
@@ -32,6 +34,7 @@ pub fn run() {
             // RPC commands
             rpc::get_chain_config,
             rpc::get_balance,
+            rpc::get_gas_price,
             rpc::estimate_gas,
             rpc::send_raw_transaction,
             rpc::get_transaction_receipt,
@@ -46,6 +49,25 @@ pub fn run() {
             nft::get_nft_metadata,
             // ERC20 commands
             erc20::get_token_info,
+            erc20::get_erc20_balance,
+            // Security commands
+            security::setup_pin_code,
+            security::verify_pin_code,
+            security::verify_biometric,
+            security::lock_app,
+            security::unlock_app,
+            security::get_auth_state,
+            security::get_security_settings,
+            security::update_security_settings,
+            security::enable_app_lock,
+            security::disable_app_lock,
+            security::enable_biometric,
+            security::disable_biometric,
+            security::disable_pin_code,
+            security::update_activity,
+            security::check_auto_lock,
+            security::get_remaining_attempts,
+            security::reset_failed_attempts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

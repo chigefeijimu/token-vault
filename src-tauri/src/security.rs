@@ -327,9 +327,10 @@ impl SecurityManager {
 // Tauri commands
 
 #[tauri::command]
-pub fn setup_pin_code(pin: String, state: tauri::State<'_, SecurityManager>) -> Result<bool, String> {
+pub fn setup_pin_code(pin: String, state: tauri::State<'_, SecurityManager>) -> Result<(), String> {
     state
         .setup_pin(pin)
+        .map(|_| ())
         .map_err(|e| e.to_string())
 }
 

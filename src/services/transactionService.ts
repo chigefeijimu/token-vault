@@ -113,10 +113,10 @@ export async function getTransactionReceipt(
 /**
  * Get current gas price
  * @param chainId - The chain ID
- * @returns Gas price in hex string
+ * @returns Gas price info
  */
-export async function getGasPrice(chainId: number): Promise<string> {
-  return invoke<string>('get_gas_price', { chainId });
+export async function getGasPrice(chainId: number): Promise<{ slow: string; standard: string; fast: string; unit: string }> {
+  return invoke<{ slow: string; standard: string; fast: string; unit: string }>('get_gas_price', { chainId });
 }
 
 /**

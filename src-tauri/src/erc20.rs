@@ -43,7 +43,27 @@ pub async fn get_token_info(
 }
 
 /// Get ERC20 token balance for an address
+#[tauri::command]
 pub async fn get_erc20_balance(
+    token_address: String,
+    wallet_address: String,
+    chain_id: u64,
+) -> Result<TokenBalance, String> {
+    let rpc_url = match chain_id {
+        1 => "https://eth.llamarpc.com",
+        56 => "https://bsc-dataseed.binance.org",
+        137 => "https://polygon-rpc.com",
+        42161 => "https://arb1.arbitrum.io/rpc",
+        10 => "https://mainnet.optimism.io",
+        43114 => "https://api.avax.network/ext/bc/C/rpc",
+        _ => return Err(format!("Unsupported chain: {}", chain_id)),
+    };
+
+    fetch_erc20_balance(rpc_url, &token_address, &wallet_address).await
+}
+
+/// Internal: Get ERC20 token balance for an address
+async fn fetch_erc20_balance(
     rpc_url: &str,
     token_address: &str,
     wallet_address: &str,

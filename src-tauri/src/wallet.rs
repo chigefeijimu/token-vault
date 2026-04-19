@@ -32,6 +32,15 @@ pub struct WalletInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateWalletResult {
+    pub id: String,
+    pub name: String,
+    pub address: String,
+    pub created_at: String,
+    pub mnemonic: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletData {
     pub mnemonic: String,
     pub private_key: String,
@@ -230,9 +239,23 @@ impl Default for WalletManager {
 // ============== Tauri Commands ==============
 
 #[tauri::command]
-pub fn create_wallet(name: String, password: String) -> Result<WalletInfo, String> {
+pub fn create_wallet(name: String, password: String) -> Result<CreateWalletResult, String> {
     let mut manager = WALLET_MANAGER.lock().unwrap();
-    manager.create_wallet(&name, &password).map_err(|e| e.to_string())
+    let info = manager.create_wallet(&name, &password).map_err(|e| e.to_string())?;
+    
+    // Retrieve the mnemonic from the stored wallet
+    let wallet = manager.wallets.get(&info.id)
+        .ok_or_else(|| "Wallet not found after creation".to_string())?;
+    let mnemonic = wallet.mnemonic.clone()
+        .ok_or_else(|| "Mnemonic not available".to_string())?;
+    
+    Ok(CreateWalletResult {
+        id: info.id,
+        name: info.name,
+        address: info.address,
+        created_at: info.created_at,
+        mnemonic,
+    })
 }
 
 #[tauri::command]

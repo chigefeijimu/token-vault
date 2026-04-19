@@ -35,6 +35,7 @@ export function SendTransfer() {
         from: selectedWallet.address,
         to: recipient,
         value: BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(),
+        data: null,
         chainId,
       });
       setGasLimit(result.gas_limit);
