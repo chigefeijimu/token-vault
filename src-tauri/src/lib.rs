@@ -1,3 +1,5 @@
+pub mod errors;
+pub mod storage;
 mod crypto;
 mod wallet;
 mod rpc;
@@ -8,10 +10,20 @@ mod nft;
 mod erc20;
 mod security;
 
+use std::path::PathBuf;
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(security::SecurityManager::new())
+        .setup(|app| {
+            // Initialize SQLite storage in app data directory
+            let app_data_dir = app.path().app_data_dir()
+                .unwrap_or_else(|_| PathBuf::from("."));
+            let _ = storage::init_storage(app_data_dir);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Crypto commands
             crypto::generate_private_key,
@@ -68,10 +80,22 @@ pub fn run() {
             security::check_auto_lock,
             security::get_remaining_attempts,
             security::reset_failed_attempts,
+            // Storage commands
+            storage::storage_init,
+            storage::storage_save_wallet,
+            storage::storage_load_wallet,
+            storage::storage_get_all_wallets,
+            storage::storage_delete_wallet,
+            storage::storage_save_transaction,
+            storage::storage_get_wallet_transactions,
+            storage::storage_get_all_transactions,
+            storage::storage_update_transaction_status,
+            storage::storage_load_settings,
+            storage::storage_save_settings,
+            storage::storage_update_setting,
+            storage::storage_export_json,
+            storage::storage_clear_all_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
-
-mod errors;

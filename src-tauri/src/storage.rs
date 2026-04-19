@@ -1,12 +1,10 @@
-// Persistent storage module for wallet data, transactions, and settings
-// Uses JSON file storage with optional encryption for sensitive data
+// Persistent storage module using SQLite
+// Replaces JSON file storage with a proper relational database
 
 use crate::errors::AppError;
 use crate::wallet::WalletInfo;
-use crate::crypto::{self, CryptoError};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use thiserror::Error;
@@ -15,6 +13,8 @@ use thiserror::Error;
 pub enum StorageError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Database error: {0}")]
+    Database(#[from] rusqlite::Error),
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
     #[error("Encryption error: {0}")]
@@ -30,12 +30,19 @@ pub enum StorageError {
 impl From<StorageError> for AppError {
     fn from(err: StorageError) -> Self {
         match err {
-            StorageError::Io(e) => AppError::Storage(1000, e.to_string()),
-            StorageError::Serialization(e) => AppError::Storage(1001, e.to_string()),
-            StorageError::Encryption(e) => AppError::Storage(1002, e),
-            StorageError::NotInitialized => AppError::Storage(1003, "Data directory not initialized".to_string()),
-            StorageError::WalletNotFound(id) => AppError::Storage(1004, format!("Wallet not found: {}", id)),
-            StorageError::TransactionNotFound(hash) => AppError::Storage(1005, format!("Transaction not found: {}", hash)),
+            StorageError::Io(e) => AppError::Storage {
+                code: 1006,
+                message: format!("IO error: {}", e),
+            },
+            StorageError::Database(e) => AppError::Storage {
+                code: 1000,
+                message: e.to_string(),
+            },
+            StorageError::Serialization(e) => AppError::Storage { code: 1001, message: e.to_string() },
+            StorageError::Encryption(e) => AppError::Storage { code: 1002, message: e },
+            StorageError::NotInitialized => AppError::Storage { code: 1003, message: "Data directory not initialized".to_string() },
+            StorageError::WalletNotFound(id) => AppError::Storage { code: 1004, message: format!("Wallet not found: {}", id) },
+            StorageError::TransactionNotFound(hash) => AppError::Storage { code: 1005, message: format!("Transaction not found: {}", hash) },
         }
     }
 }
@@ -113,218 +120,208 @@ pub struct WalletMetadata {
     pub chain_ids: Vec<u64>,
 }
 
-/// Storage metadata/index
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StorageIndex {
-    pub version: String,
-    pub last_updated: u64,
-    pub wallets: Vec<WalletMetadata>,
-}
-
-impl Default for StorageIndex {
-    fn default() -> Self {
-        Self {
-            version: "1.0.0".to_string(),
-            last_updated: chrono_timestamp(),
-            wallets: Vec::new(),
-        }
-    }
-}
-
-/// Main storage service
+/// Main storage service backed by SQLite
 pub struct StorageService {
-    data_dir: PathBuf,
-    wallets_file: PathBuf,
-    transactions_file: PathBuf,
-    settings_file: PathBuf,
-    index_file: PathBuf,
-    master_key: Option<Vec<u8>>,
+    db: Mutex<Connection>,
 }
 
 impl StorageService {
-    /// Create a new storage service with the specified data directory
-    pub fn new(data_dir: PathBuf) -> Result<Self, StorageError> {
-        let storage = Self {
-            wallets_file: data_dir.join("wallets.json"),
-            transactions_file: data_dir.join("transactions.json"),
-            settings_file: data_dir.join("settings.json"),
-            index_file: data_dir.join("index.json"),
-            data_dir,
-            master_key: None,
-        };
+    /// Create a new storage service — opens (or creates) the SQLite database
+    pub fn new(db_path: PathBuf) -> Result<Self, StorageError> {
+        // Ensure parent directory exists
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let conn = Connection::open(&db_path)?;
+
+        // Enable WAL mode for better concurrency
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
+
+        let storage = Self { db: Mutex::new(conn) };
         Ok(storage)
     }
 
-    /// Initialize the storage directories and files
+    /// Initialize tables
     pub fn initialize(&self) -> Result<(), StorageError> {
-        fs::create_dir_all(&self.data_dir)?;
-        
-        // Initialize index if not exists
-        if !self.index_file.exists() {
-            let index = StorageIndex::default();
-            fs::write(&self.index_file, serde_json::to_string_pretty(&index)?)?;
-        }
-        
-        // Initialize wallets file if not exists
-        if !self.wallets_file.exists() {
-            fs::write(&self.wallets_file, "[]")?;
-        }
-        
-        // Initialize transactions file if not exists
-        if !self.transactions_file.exists() {
-            fs::write(&self.transactions_file, "[]")?;
-        }
-        
-        // Initialize settings file if not exists
-        if !self.settings_file.exists() {
-            let settings = AppSettings::default();
-            fs::write(&self.settings_file, serde_json::to_string_pretty(&settings)?)?;
-        }
-        
+        let conn = self.db.lock().unwrap();
+
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS wallets (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                address     TEXT NOT NULL,
+                created_at  INTEGER NOT NULL,
+                encrypted_mnemonic   TEXT,
+                encrypted_private_key TEXT,
+                salt        TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_wallets_address ON wallets(address);
+
+            CREATE TABLE IF NOT EXISTS wallet_meta (
+                id              TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                address         TEXT NOT NULL,
+                created_at      INTEGER NOT NULL,
+                updated_at      INTEGER NOT NULL,
+                last_used       INTEGER,
+                chain_ids       TEXT NOT NULL DEFAULT '[]'
+            );
+
+            CREATE TABLE IF NOT EXISTS transactions (
+                hash           TEXT PRIMARY KEY,
+                tx_from        TEXT NOT NULL,
+                tx_to          TEXT NOT NULL,
+                value          TEXT NOT NULL,
+                timestamp      INTEGER NOT NULL,
+                block_number   TEXT NOT NULL,
+                block_hash     TEXT NOT NULL,
+                chain_id       INTEGER NOT NULL,
+                status         TEXT NOT NULL,
+                gas_used       TEXT,
+                gas_price      TEXT,
+                nonce          INTEGER,
+                tx_input       TEXT,
+                wallet_id      TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_tx_wallet ON transactions(wallet_id);
+            CREATE INDEX IF NOT EXISTS idx_tx_chain  ON transactions(chain_id);
+            CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            ",
+        )?;
+
         Ok(())
     }
 
-    /// Set the master encryption key for sensitive data
-    pub fn set_master_key(&mut self, key: Vec<u8>) {
-        self.master_key = Some(key);
-    }
-
-    /// Get the data directory path
-    pub fn get_data_dir(&self) -> &PathBuf {
-        &self.data_dir
+    /// Get current timestamp in seconds
+    fn now() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
     }
 
     // ==================== Wallet Operations ====================
 
     /// Save wallet data (encrypted)
-    pub fn save_wallet(&self, wallet: &WalletInfo, encrypted_mnemonic: Option<&str>, encrypted_pk: Option<&str>, salt: &str) -> Result<(), StorageError> {
-        // Load existing wallets
-        let mut wallets: Vec<EncryptedWalletData> = if self.wallets_file.exists() {
-            let content = fs::read_to_string(&self.wallets_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+    pub fn save_wallet(
+        &self,
+        wallet: &WalletInfo,
+        encrypted_mnemonic: Option<&str>,
+        encrypted_pk: Option<&str>,
+        salt: &str,
+    ) -> Result<(), StorageError> {
+        let conn = self.db.lock().unwrap();
 
-        // Check if wallet already exists
-        let existing_idx = wallets.iter().position(|w| w.id == wallet.id);
+        conn.execute(
+            "INSERT OR REPLACE INTO wallets
+             (id, name, address, created_at, encrypted_mnemonic, encrypted_private_key, salt)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                wallet.id,
+                wallet.name,
+                wallet.address,
+                wallet.created_at as i64,
+                encrypted_mnemonic,
+                encrypted_pk,
+                salt,
+            ],
+        )?;
 
-        let encrypted_wallet = EncryptedWalletData {
-            id: wallet.id.clone(),
-            name: wallet.name.clone(),
-            address: wallet.address.clone(),
-            created_at: wallet.created_at,
-            encrypted_mnemonic: encrypted_mnemonic.map(String::from),
-            encrypted_private_key: encrypted_pk.map(String::from),
-            salt: salt.to_string(),
-        };
-
-        if let Some(idx) = existing_idx {
-            wallets[idx] = encrypted_wallet;
-        } else {
-            wallets.push(encrypted_wallet);
-        }
-
-        // Save wallets
-        fs::write(&self.wallets_file, serde_json::to_string_pretty(&wallets)?)?;
-
-        // Update index
-        self.update_wallet_index(wallet)?;
+        // Update wallet_meta index
+        let now = Self::now();
+        conn.execute(
+            "INSERT OR REPLACE INTO wallet_meta
+             (id, name, address, created_at, updated_at, last_used, chain_ids)
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL, '[]')",
+            params![wallet.id, wallet.name, wallet.address, wallet.created_at as i64, now as i64],
+        )?;
 
         Ok(())
     }
 
     /// Load wallet data
     pub fn load_wallet(&self, wallet_id: &str) -> Result<EncryptedWalletData, StorageError> {
-        let content = fs::read_to_string(&self.wallets_file)?;
-        let wallets: Vec<EncryptedWalletData> = serde_json::from_str(&content)?;
+        let conn = self.db.lock().unwrap();
 
-        wallets
-            .into_iter()
-            .find(|w| w.id == wallet_id)
-            .ok_or_else(|| StorageError::WalletNotFound(wallet_id.to_string()))
+        let w = conn.query_row(
+            "SELECT id, name, address, created_at, encrypted_mnemonic,
+                    encrypted_private_key, salt
+             FROM wallets WHERE id = ?1",
+            params![wallet_id],
+            |row| {
+                Ok(EncryptedWalletData {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    address: row.get(2)?,
+                    created_at: row.get::<_, i64>(3)? as u64,
+                    encrypted_mnemonic: row.get(4)?,
+                    encrypted_private_key: row.get(5)?,
+                    salt: row.get(6)?,
+                })
+            },
+        )
+        .map_err(|_| StorageError::WalletNotFound(wallet_id.to_string()))?;
+
+        Ok(w)
     }
 
     /// Get all wallet metadata (non-sensitive)
     pub fn get_all_wallets(&self) -> Result<Vec<WalletMetadata>, StorageError> {
-        let index: StorageIndex = if self.index_file.exists() {
-            let content = fs::read_to_string(&self.index_file)?;
-            serde_json::from_str(&content)?
-        } else {
-            StorageIndex::default()
-        };
-        Ok(index.wallets)
+        let conn = self.db.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, name, address, created_at, updated_at, last_used, chain_ids
+             FROM wallet_meta ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            let chain_ids_str: String = row.get(6)?;
+            let chain_ids: Vec<u64> = serde_json::from_str(&chain_ids_str).unwrap_or_default();
+            Ok(WalletMetadata {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                address: row.get(2)?,
+                created_at: row.get::<_, i64>(3)? as u64,
+                updated_at: row.get::<_, i64>(4)? as u64,
+                last_used: row.get::<_, Option<i64>>(5)?.map(|v| v as u64),
+                chain_ids,
+            })
+        })?;
+
+        let mut metas = Vec::new();
+        for row in rows {
+            metas.push(row?);
+        }
+        Ok(metas)
     }
 
     /// Delete a wallet
     pub fn delete_wallet(&self, wallet_id: &str) -> Result<(), StorageError> {
-        // Remove from wallets file
-        let content = fs::read_to_string(&self.wallets_file)?;
-        let mut wallets: Vec<EncryptedWalletData> = serde_json::from_str(&content)?;
-        wallets.retain(|w| w.id != wallet_id);
-        fs::write(&self.wallets_file, serde_json::to_string_pretty(&wallets)?)?;
-
+        let conn = self.db.lock().unwrap();
+        conn.execute("DELETE FROM wallets WHERE id = ?1", params![wallet_id])?;
+        conn.execute("DELETE FROM wallet_meta WHERE id = ?1", params![wallet_id])?;
         // Remove associated transactions
-        self.delete_wallet_transactions(wallet_id)?;
-
-        // Update index
-        let mut index: StorageIndex = if self.index_file.exists() {
-            let content = fs::read_to_string(&self.index_file)?;
-            serde_json::from_str(&content)?
-        } else {
-            StorageIndex::default()
-        };
-        index.wallets.retain(|w| w.id != wallet_id);
-        index.last_updated = chrono_timestamp();
-        fs::write(&self.index_file, serde_json::to_string_pretty(&index)?)?;
-
-        Ok(())
-    }
-
-    fn update_wallet_index(&self, wallet: &WalletInfo) -> Result<(), StorageError> {
-        let mut index: StorageIndex = if self.index_file.exists() {
-            let content = fs::read_to_string(&self.index_file)?;
-            serde_json::from_str(&content)?
-        } else {
-            StorageIndex::default()
-        };
-
-        let now = chrono_timestamp();
-        
-        if let Some(existing) = index.wallets.iter_mut().find(|w| w.id == wallet.id) {
-            existing.name = wallet.name.clone();
-            existing.updated_at = now;
-        } else {
-            index.wallets.push(WalletMetadata {
-                id: wallet.id.clone(),
-                name: wallet.name.clone(),
-                address: wallet.address.clone(),
-                created_at: wallet.created_at,
-                updated_at: now,
-                last_used: None,
-                chain_ids: vec![],
-            });
-        }
-
-        index.last_updated = now;
-        fs::write(&self.index_file, serde_json::to_string_pretty(&index)?)?;
+        conn.execute("DELETE FROM transactions WHERE wallet_id = ?1", params![wallet_id])?;
         Ok(())
     }
 
     /// Update wallet last used timestamp
     pub fn update_wallet_last_used(&self, wallet_id: &str) -> Result<(), StorageError> {
-        let mut index: StorageIndex = if self.index_file.exists() {
-            let content = fs::read_to_string(&self.index_file)?;
-            serde_json::from_str(&content)?
-        } else {
-            StorageIndex::default()
-        };
-
-        if let Some(wallet) = index.wallets.iter_mut().find(|w| w.id == wallet_id) {
-            wallet.last_used = Some(chrono_timestamp());
-        }
-
-        fs::write(&self.index_file, serde_json::to_string_pretty(&index)?)?;
+        let conn = self.db.lock().unwrap();
+        let now = Self::now() as i64;
+        conn.execute(
+            "UPDATE wallet_meta SET last_used = ?1 WHERE id = ?2",
+            params![now, wallet_id],
+        )?;
         Ok(())
     }
 
@@ -332,260 +329,281 @@ impl StorageService {
 
     /// Save a transaction
     pub fn save_transaction(&self, tx: &TransactionRecord) -> Result<(), StorageError> {
-        let mut transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            let content = fs::read_to_string(&self.transactions_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-
-        // Check if transaction already exists (update) or is new
-        if let Some(existing_idx) = transactions.iter().position(|t| t.hash == tx.hash) {
-            transactions[existing_idx] = tx.clone();
-        } else {
-            transactions.push(tx.clone());
-        }
-
-        // Sort by timestamp descending
-        transactions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-
-        fs::write(&self.transactions_file, serde_json::to_string_pretty(&transactions)?)?;
+        let conn = self.db.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO transactions
+             (hash, tx_from, tx_to, value, timestamp, block_number, block_hash,
+              chain_id, status, gas_used, gas_price, nonce, tx_input, wallet_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            params![
+                tx.hash,
+                tx.from,
+                tx.to,
+                tx.value,
+                tx.timestamp as i64,
+                tx.block_number,
+                tx.block_hash,
+                tx.chain_id as i64,
+                tx.status,
+                tx.gas_used,
+                tx.gas_price,
+                tx.nonce.map(|n| n as i64),
+                tx.input,
+                tx.wallet_id,
+            ],
+        )?;
         Ok(())
     }
 
     /// Get transactions for a wallet
     pub fn get_wallet_transactions(&self, wallet_id: &str) -> Result<Vec<TransactionRecord>, StorageError> {
-        let transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            let content = fs::read_to_string(&self.transactions_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        let conn = self.db.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT hash, tx_from, tx_to, value, timestamp, block_number, block_hash,
+                    chain_id, status, gas_used, gas_price, nonce, tx_input, wallet_id
+             FROM transactions WHERE wallet_id = ?1 ORDER BY timestamp DESC",
+        )?;
 
-        Ok(transactions.into_iter().filter(|t| t.wallet_id == wallet_id).collect())
+        let txs: Vec<TransactionRecord> = stmt
+            .query_map(params![wallet_id], Self::map_tx_row)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(txs)
     }
 
     /// Get transactions for a specific chain
     pub fn get_chain_transactions(&self, chain_id: u64) -> Result<Vec<TransactionRecord>, StorageError> {
-        let transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            let content = fs::read_to_string(&self.transactions_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        let conn = self.db.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT hash, tx_from, tx_to, value, timestamp, block_number, block_hash,
+                    chain_id, status, gas_used, gas_price, nonce, tx_input, wallet_id
+             FROM transactions WHERE chain_id = ?1 ORDER BY timestamp DESC",
+        )?;
 
-        Ok(transactions.into_iter().filter(|t| t.chain_id == chain_id).collect())
+        let txs: Vec<TransactionRecord> = stmt
+            .query_map(params![chain_id as i64], Self::map_tx_row)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(txs)
     }
 
     /// Get all transactions
     pub fn get_all_transactions(&self) -> Result<Vec<TransactionRecord>, StorageError> {
-        let transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            let content = fs::read_to_string(&self.transactions_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        let conn = self.db.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT hash, tx_from, tx_to, value, timestamp, block_number, block_hash,
+                    chain_id, status, gas_used, gas_price, nonce, tx_input, wallet_id
+             FROM transactions ORDER BY timestamp DESC",
+        )?;
 
-        Ok(transactions)
+        let txs: Vec<TransactionRecord> = stmt
+            .query_map([], Self::map_tx_row)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(txs)
     }
 
     /// Update transaction status
-    pub fn update_transaction_status(&self, hash: &str, status: &str, block_number: Option<&str>, block_hash: Option<&str>) -> Result<(), StorageError> {
-        let mut transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            let content = fs::read_to_string(&self.transactions_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            return Err(StorageError::TransactionNotFound(hash.to_string()));
-        };
+    pub fn update_transaction_status(
+        &self,
+        hash: &str,
+        status: &str,
+        block_number: Option<&str>,
+        block_hash: Option<&str>,
+    ) -> Result<(), StorageError> {
+        let conn = self.db.lock().unwrap();
 
-        if let Some(tx) = transactions.iter_mut().find(|t| t.hash == hash) {
-            tx.status = status.to_string();
-            if let Some(bn) = block_number {
-                tx.block_number = bn.to_string();
-            }
-            if let Some(bh) = block_hash {
-                tx.block_hash = bh.to_string();
-            }
-        } else {
+        let rows_affected = conn.execute(
+            "UPDATE transactions
+             SET status = ?1,
+                 block_number = COALESCE(?2, block_number),
+                 block_hash   = COALESCE(?3, block_hash)
+             WHERE hash = ?4",
+            params![status, block_number, block_hash, hash],
+        )?;
+
+        if rows_affected == 0 {
             return Err(StorageError::TransactionNotFound(hash.to_string()));
         }
-
-        fs::write(&self.transactions_file, serde_json::to_string_pretty(&transactions)?)?;
         Ok(())
     }
 
-    /// Delete transactions for a wallet
-    fn delete_wallet_transactions(&self, wallet_id: &str) -> Result<(), StorageError> {
-        let transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            let content = fs::read_to_string(&self.transactions_file)?;
-            serde_json::from_str(&content).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-
-        let filtered: Vec<TransactionRecord> = transactions.into_iter().filter(|t| t.wallet_id != wallet_id).collect();
-        fs::write(&self.transactions_file, serde_json::to_string_pretty(&filtered)?)?;
-        Ok(())
+    fn map_tx_row(row: &rusqlite::Row) -> rusqlite::Result<TransactionRecord> {
+        Ok(TransactionRecord {
+            hash: row.get(0)?,
+            from: row.get(1)?,
+            to: row.get(2)?,
+            value: row.get(3)?,
+            timestamp: row.get::<_, i64>(4)? as u64,
+            block_number: row.get(5)?,
+            block_hash: row.get(6)?,
+            chain_id: row.get::<_, i64>(7)? as u64,
+            status: row.get(8)?,
+            gas_used: row.get(9)?,
+            gas_price: row.get(10)?,
+            nonce: row.get::<_, Option<i64>>(11)?.map(|n| n as u64),
+            input: row.get(12)?,
+            wallet_id: row.get(13)?,
+        })
     }
 
     // ==================== Settings Operations ====================
 
     /// Load application settings
     pub fn load_settings(&self) -> Result<AppSettings, StorageError> {
-        if !self.settings_file.exists() {
+        let conn = self.db.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+        let rows: Vec<(String, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if rows.is_empty() {
             return Ok(AppSettings::default());
         }
-        
-        let content = fs::read_to_string(&self.settings_file)?;
-        let settings: AppSettings = serde_json::from_str(&content)?;
+
+        let mut settings = AppSettings::default();
+        for (key, value) in rows {
+            match key.as_str() {
+                "theme" => settings.theme = value,
+                "currency" => settings.currency = value,
+                "language" => settings.language = value,
+                "auto_lock_minutes" => {
+                    settings.auto_lock_minutes = value.parse().unwrap_or(5)
+                }
+                "backup_reminder" => {
+                    settings.backup_reminder = value == "true"
+                }
+                "rpc_timeout_seconds" => {
+                    settings.rpc_timeout_seconds = value.parse().unwrap_or(30)
+                }
+                "default_chain_id" => {
+                    settings.default_chain_id = value.parse().unwrap_or(1)
+                }
+                "hide_balances" => settings.hide_balances = value == "true",
+                "max_gas_price_gwei" => {
+                    settings.max_gas_price_gwei = value.parse().ok()
+                }
+                _ => {}
+            }
+        }
         Ok(settings)
     }
 
     /// Save application settings
     pub fn save_settings(&self, settings: &AppSettings) -> Result<(), StorageError> {
-        fs::write(&self.settings_file, serde_json::to_string_pretty(&settings)?)?;
+        let conn = self.db.lock().unwrap();
+
+        let pairs = [
+            ("theme", settings.theme.clone()),
+            ("currency", settings.currency.clone()),
+            ("language", settings.language.clone()),
+            ("auto_lock_minutes", settings.auto_lock_minutes.to_string()),
+            ("backup_reminder", settings.backup_reminder.to_string()),
+            ("rpc_timeout_seconds", settings.rpc_timeout_seconds.to_string()),
+            ("default_chain_id", settings.default_chain_id.to_string()),
+            ("hide_balances", settings.hide_balances.to_string()),
+            (
+                "max_gas_price_gwei",
+                settings
+                    .max_gas_price_gwei
+                    .map(|v| v.to_string())
+                    .unwrap_or_default(),
+            ),
+        ];
+
+        for (key, value) in pairs {
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                params![key, value],
+            )?;
+        }
         Ok(())
     }
 
     /// Update a single setting
     pub fn update_setting(&self, key: &str, value: serde_json::Value) -> Result<(), StorageError> {
-        let mut settings = self.load_settings()?;
-        
-        match key {
-            "theme" => if let Some(v) = value.as_str() { settings.theme = v.to_string(); },
-            "currency" => if let Some(v) = value.as_str() { settings.currency = v.to_string(); },
-            "language" => if let Some(v) = value.as_str() { settings.language = v.to_string(); },
-            "auto_lock_minutes" => if let Some(v) = value.as_u64() { settings.auto_lock_minutes = v as u32; },
-            "backup_reminder" => if let Some(v) = value.as_bool() { settings.backup_reminder = v; },
-            "rpc_timeout_seconds" => if let Some(v) = value.as_u64() { settings.rpc_timeout_seconds = v as u32; },
-            "default_chain_id" => if let Some(v) = value.as_u64() { settings.default_chain_id = v as u64; },
-            "hide_balances" => if let Some(v) = value.as_bool() { settings.hide_balances = v; },
-            "max_gas_price_gwei" => settings.max_gas_price_gwei = value.as_f64(),
-            _ => return Err(StorageError::Encryption(format!("Unknown setting: {}", key))),
-        }
-
-        self.save_settings(&settings)?;
+        let conn = self.db.lock().unwrap();
+        let value_str = match &value {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            serde_json::Value::Bool(b) => b.to_string(),
+            _ => return Err(StorageError::Encryption(format!("Unsupported setting type for key: {}", key))),
+        };
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+            params![key, value_str],
+        )?;
         Ok(())
     }
 
     // ==================== Backup/Export Operations ====================
 
-    /// Export all data as encrypted backup
-    pub fn create_backup(&self, encryption_key: &[u8]) -> Result<Vec<u8>, StorageError> {
+    /// Export all data as a JSON blob (encrypted backup would be done by caller)
+    pub fn export_all_json(&self) -> Result<Vec<u8>, StorageError> {
         #[derive(Serialize)]
         struct BackupData {
-            version: String,
-            timestamp: u64,
-            index: StorageIndex,
             wallets: Vec<EncryptedWalletData>,
             transactions: Vec<TransactionRecord>,
             settings: AppSettings,
+            wallet_meta: Vec<WalletMetadata>,
         }
 
-        let index: StorageIndex = if self.index_file.exists() {
-            serde_json::from_str(&fs::read_to_string(&self.index_file)?)?
-        } else {
-            StorageIndex::default()
-        };
+        let conn = self.db.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, address, created_at, encrypted_mnemonic,
+                    encrypted_private_key, salt FROM wallets",
+        )?;
+        let wallets: Vec<EncryptedWalletData> = stmt
+            .query_map([], |row| {
+                Ok(EncryptedWalletData {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    address: row.get(2)?,
+                    created_at: row.get::<_, i64>(3)? as u64,
+                    encrypted_mnemonic: row.get(4)?,
+                    encrypted_private_key: row.get(5)?,
+                    salt: row.get(6)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+        drop(conn);
 
-        let wallets: Vec<EncryptedWalletData> = if self.wallets_file.exists() {
-            serde_json::from_str(&fs::read_to_string(&self.wallets_file)?)?
-        } else {
-            Vec::new()
-        };
-
-        let transactions: Vec<TransactionRecord> = if self.transactions_file.exists() {
-            serde_json::from_str(&fs::read_to_string(&self.transactions_file)?)?
-        } else {
-            Vec::new()
-        };
-
+        let transactions = self.get_all_transactions()?;
         let settings = self.load_settings()?;
+        let wallet_meta = self.get_all_wallets()?;
 
-        let backup = BackupData {
-            version: "1.0.0".to_string(),
-            timestamp: chrono_timestamp(),
-            index,
-            wallets,
-            transactions,
-            settings,
-        };
-
-        let json = serde_json::to_vec(&backup)
-            .map_err(|e| StorageError::Serialization(e))?;
-
-        // Encrypt the backup
-        let encrypted = crypto::encrypt_data(&json, encryption_key)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        Ok(encrypted)
-    }
-
-    /// Restore from encrypted backup
-    pub fn restore_backup(&self, encrypted_data: &[u8], encryption_key: &[u8]) -> Result<(), StorageError> {
-        let decrypted = crypto::decrypt_data(encrypted_data, encryption_key)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        #[derive(Deserialize)]
-        struct BackupData {
-            version: String,
-            index: StorageIndex,
-            wallets: Vec<EncryptedWalletData>,
-            transactions: Vec<TransactionRecord>,
-            settings: AppSettings,
-        }
-
-        let backup: BackupData = serde_json::from_slice(&decrypted)
-            .map_err(|e| StorageError::Serialization(e))?;
-
-        // Restore all data
-        fs::write(&self.index_file, serde_json::to_string_pretty(&backup.index)?)?;
-        fs::write(&self.wallets_file, serde_json::to_string_pretty(&backup.wallets)?)?;
-        fs::write(&self.transactions_file, serde_json::to_string_pretty(&backup.transactions)?)?;
-        fs::write(&self.settings_file, serde_json::to_string_pretty(&backup.settings)?)?;
-
-        Ok(())
+        let backup = BackupData { wallets, transactions, settings, wallet_meta };
+        serde_json::to_vec(&backup).map_err(StorageError::Serialization)
     }
 
     /// Clear all data (factory reset)
     pub fn clear_all_data(&self) -> Result<(), StorageError> {
-        if self.wallets_file.exists() {
-            fs::remove_file(&self.wallets_file)?;
-        }
-        if self.transactions_file.exists() {
-            fs::remove_file(&self.transactions_file)?;
-        }
-        if self.settings_file.exists() {
-            fs::remove_file(&self.settings_file)?;
-        }
-        if self.index_file.exists() {
-            fs::remove_file(&self.index_file)?;
-        }
-
-        // Re-initialize with defaults
-        self.initialize()?;
+        let conn = self.db.lock().unwrap();
+        conn.execute_batch(
+            "DELETE FROM wallets; DELETE FROM wallet_meta;
+             DELETE FROM transactions; DELETE FROM settings;",
+        )?;
         Ok(())
     }
 }
 
-/// Get current timestamp in seconds
-fn chrono_timestamp() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-}
+// ==================== Global Storage ====================
 
-// Global storage instance with mutex for thread safety
-lazy_static::lazy_static! {
+use lazy_static::lazy_static;
+
+lazy_static! {
     pub static ref STORAGE: Mutex<Option<StorageService>> = Mutex::new(None);
 }
 
 /// Initialize the global storage service
 pub fn init_storage(data_dir: PathBuf) -> Result<(), StorageError> {
-    let storage = StorageService::new(data_dir)?;
+    let db_path = data_dir.join("tokenvault.db");
+    let storage = StorageService::new(db_path)?;
     storage.initialize()?;
-    
+
     let mut global = STORAGE.lock().unwrap();
     *global = Some(storage);
     Ok(())
@@ -620,20 +638,22 @@ pub fn storage_save_wallet(
 ) -> Result<(), AppError> {
     let guard = get_storage()?;
     let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
-    
+
     let wallet = WalletInfo {
         id,
         name,
         address,
         created_at,
     };
-    
-    storage.save_wallet(
-        &wallet,
-        encrypted_mnemonic.as_deref(),
-        encrypted_private_key.as_deref(),
-        &salt,
-    ).map_err(|e| e.into())
+
+    storage
+        .save_wallet(
+            &wallet,
+            encrypted_mnemonic.as_deref(),
+            encrypted_private_key.as_deref(),
+            &salt,
+        )
+        .map_err(|e| e.into())
 }
 
 #[tauri::command]
@@ -676,7 +696,7 @@ pub fn storage_save_transaction(
 ) -> Result<(), AppError> {
     let guard = get_storage()?;
     let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
-    
+
     let tx = TransactionRecord {
         hash,
         from,
@@ -693,7 +713,7 @@ pub fn storage_save_transaction(
         input,
         wallet_id,
     };
-    
+
     storage.save_transaction(&tx).map_err(|e| e.into())
 }
 
@@ -720,7 +740,8 @@ pub fn storage_update_transaction_status(
 ) -> Result<(), AppError> {
     let guard = get_storage()?;
     let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
-    storage.update_transaction_status(&hash, &status, block_number.as_deref(), block_hash.as_deref())
+    storage
+        .update_transaction_status(&hash, &status, block_number.as_deref(), block_hash.as_deref())
         .map_err(|e| e.into())
 }
 
@@ -746,17 +767,11 @@ pub fn storage_update_setting(key: String, value: serde_json::Value) -> Result<(
 }
 
 #[tauri::command]
-pub fn storage_create_backup(encryption_key: String) -> Result<Vec<u8>, AppError> {
+pub fn storage_export_json() -> Result<String, AppError> {
     let guard = get_storage()?;
     let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
-    storage.create_backup(encryption_key.as_bytes()).map_err(|e| e.into())
-}
-
-#[tauri::command]
-pub fn storage_restore_backup(encrypted_data: Vec<u8>, encryption_key: String) -> Result<(), AppError> {
-    let guard = get_storage()?;
-    let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
-    storage.restore_backup(&encrypted_data, encryption_key.as_bytes()).map_err(|e| e.into())
+    let bytes: Vec<u8> = storage.export_all_json().map_err(|e| -> AppError { e.into() })?;
+    Ok(String::from_utf8_lossy(&bytes).to_string())
 }
 
 #[tauri::command]
@@ -764,11 +779,4 @@ pub fn storage_clear_all_data() -> Result<(), AppError> {
     let guard = get_storage()?;
     let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
     storage.clear_all_data().map_err(|e| e.into())
-}
-
-#[tauri::command]
-pub fn storage_get_data_dir() -> Result<String, AppError> {
-    let guard = get_storage()?;
-    let storage = guard.as_ref().ok_or(StorageError::NotInitialized)?;
-    Ok(storage.get_data_dir().to_string_lossy().to_string())
 }

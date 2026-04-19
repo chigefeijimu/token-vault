@@ -31,6 +31,7 @@ k256 = "0.13"
 rlp = "0.5"
 primitive-types = "0.12"
 sha3 = "0.10"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [profile.release]
 panic = "abort"
