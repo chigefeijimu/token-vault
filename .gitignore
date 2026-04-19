@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tauri
+target/
+
+# Backup files
+*.bak
+.backups/
+
+# OS
+.DS_Store
+Thumbs.db
