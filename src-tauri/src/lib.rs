@@ -7,6 +7,7 @@ mod transaction;
 mod lib_status;
 mod version;
 mod nft;
+pub mod solana;
 mod erc20;
 mod security;
 
@@ -63,6 +64,9 @@ pub fn run() {
             // NFT commands
             nft::get_nfts,
             nft::get_nft_metadata,
+            // Solana commands
+            solana::solana_generate_wallet,
+            solana::solana_get_balance,
             // ERC20 commands
             erc20::get_token_info,
             erc20::get_erc20_balance,

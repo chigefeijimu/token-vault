@@ -3,7 +3,7 @@
 
 use crate::crypto;
 use thiserror::Error;
-use ethers::types::U256;
+use alloy::primitives::U256;
 
 #[derive(Error, Debug)]
 pub enum TransactionError {
@@ -39,7 +39,7 @@ pub fn build_eth_transaction(
         return Err(TransactionError::InvalidAddress(to.to_string()));
     }
 
-    let value = U256::from_dec_str(amount_wei)
+    let value = U256::from_str_radix(amount_wei, 10)
         .map_err(|_| TransactionError::Signing("Invalid amount".to_string()))?;
 
     let gas_price_u256 = U256::from(gas_price);
@@ -69,8 +69,7 @@ fn encode_u256(output: &mut Vec<u8>, value: &U256) {
         bytes.push(0x80); // empty byte
     } else {
         let v = *value;
-        let mut buf = [0u8; 32];
-        v.to_big_endian(&mut buf);
+        let buf: [u8; 32] = v.to_be_bytes();
         let mut start = 0;
         while start < 32 && buf[start] == 0 { start += 1; }
         bytes.extend_from_slice(&buf[start..]);

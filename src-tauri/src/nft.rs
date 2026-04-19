@@ -1,4 +1,4 @@
-use ethers::types::H160;
+use alloy::primitives::Address;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -52,7 +52,7 @@ fn get_rpc_url(chain_id: u64) -> Option<String> {
 
 pub async fn fetch_nfts(address: &str, chain_id: u64) -> Result<Vec<NFT>, String> {
     let rpc_url = get_rpc_url(chain_id).ok_or("Unsupported chain")?;
-    let address: H160 = address.parse().map_err(|e| format!("Invalid address: {}", e))?;
+    let address: Address = address.parse().map_err(|e| format!("Invalid address: {}", e))?;
 
     let client = reqwest::Client::new();
 
