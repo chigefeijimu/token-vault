@@ -5,6 +5,7 @@ mod transaction;
 mod lib_status;
 mod version;
 mod nft;
+mod erc20;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -43,6 +44,8 @@ pub fn run() {
             // NFT commands
             nft::get_nfts,
             nft::get_nft_metadata,
+            // ERC20 commands
+            erc20::get_token_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

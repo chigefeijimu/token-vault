@@ -85,3 +85,13 @@ export interface AddressValidationResult {
   chainId?: number
   error?: string
 }
+
+// Custom ERC20 token
+export interface CustomToken {
+  address: string
+  name: string
+  symbol: string
+  decimals: number
+  chainId: number
+  logoUrl?: string
+}

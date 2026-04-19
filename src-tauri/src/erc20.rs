@@ -1,7 +1,6 @@
-// ERC20 Token Balance Functions
+// ERC20 Token Functions
 
 use serde::{Deserialize, Serialize};
-use crate::rpc::Provider;
 
 /// ERC20 token balance response
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,23 +10,47 @@ pub struct TokenBalance {
     pub symbol: String,
 }
 
+/// Token info response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenInfo {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
+
+/// Get ERC20 token info (name, symbol, decimals)
+#[tauri::command]
+pub async fn get_token_info(
+    token_address: String,
+    chain_id: u64,
+) -> Result<TokenInfo, String> {
+    let rpc_url = match chain_id {
+        1 => "https://eth.llamarpc.com",
+        56 => "https://bsc-dataseed.binance.org",
+        137 => "https://polygon-rpc.com",
+        42161 => "https://arb1.arbitrum.io/rpc",
+        10 => "https://mainnet.optimism.io",
+        43114 => "https://api.avax.network/ext/bc/C/rpc",
+        _ => return Err(format!("Unsupported chain: {}", chain_id)),
+    };
+
+    let client = reqwest::Client::new();
+    let name = get_token_name(&client, rpc_url, &token_address).await?;
+    let symbol = get_token_symbol(&client, rpc_url, &token_address).await?;
+    let decimals = get_token_decimals(&client, rpc_url, &token_address).await?;
+
+    Ok(TokenInfo { name, symbol, decimals })
+}
+
 /// Get ERC20 token balance for an address
-/// 
-/// # Arguments
-/// * `rpc_url` - The RPC endpoint URL
-/// * `token_address` - The ERC20 token contract address
-/// * `wallet_address` - The wallet address to query balance for
-/// 
-/// # Returns
-/// * `Ok(TokenBalance)` - The token balance information
-/// * `Err(String)` - Error message if the call fails
 pub async fn get_erc20_balance(
     rpc_url: &str,
     token_address: &str,
     wallet_address: &str,
 ) -> Result<TokenBalance, String> {
+    let client = reqwest::Client::new();
+
     // ERC20 balanceOf function selector: 0x70a08231
-    // padded address: 20 bytes = 24 bytes padding + 20 bytes address
     let padded_address = format!(
         "0x70a08231000000000000000000000000{}",
         wallet_address.trim_start_matches("0x")
@@ -41,9 +64,8 @@ pub async fn get_erc20_balance(
         "latest"
     ]);
 
-    let response: serde_json::Value = Provider::eth_call(rpc_url, "eth_call", params)
-        .await
-        .map_err(|e| e.to_string())?;
+    let response: serde_json::Value = eth_call(&client, rpc_url, params)
+        .await?;
 
     let balance_hex = response["result"]
         .as_str()
@@ -57,8 +79,8 @@ pub async fn get_erc20_balance(
     };
 
     // Get token metadata (decimals and symbol)
-    let decimals = get_token_decimals(rpc_url, token_address).await?;
-    let symbol = get_token_symbol(rpc_url, token_address).await?;
+    let decimals = get_token_decimals(&client, rpc_url, token_address).await?;
+    let symbol = get_token_symbol(&client, rpc_url, token_address).await?;
 
     Ok(TokenBalance {
         balance: balance_str,
@@ -68,7 +90,7 @@ pub async fn get_erc20_balance(
 }
 
 /// Get token decimals
-async fn get_token_decimals(rpc_url: &str, token_address: &str) -> Result<u8, String> {
+async fn get_token_decimals(client: &reqwest::Client, rpc_url: &str, token_address: &str) -> Result<u8, String> {
     // decimals() function selector: 0x313ce567
     let data = "0x313ce567".to_string();
     
@@ -80,9 +102,7 @@ async fn get_token_decimals(rpc_url: &str, token_address: &str) -> Result<u8, St
         "latest"
     ]);
 
-    let response: serde_json::Value = Provider::eth_call(rpc_url, "eth_call", params)
-        .await
-        .map_err(|e| e.to_string())?;
+    let response: serde_json::Value = eth_call(client, rpc_url, params).await?;
 
     let decimals_hex = response["result"]
         .as_str()
@@ -95,7 +115,7 @@ async fn get_token_decimals(rpc_url: &str, token_address: &str) -> Result<u8, St
 }
 
 /// Get token symbol
-async fn get_token_symbol(rpc_url: &str, token_address: &str) -> Result<String, String> {
+async fn get_token_symbol(client: &reqwest::Client, rpc_url: &str, token_address: &str) -> Result<String, String> {
     // symbol() function selector: 0x95d89b41
     let data = "0x95d89b41".to_string();
     
@@ -107,9 +127,7 @@ async fn get_token_symbol(rpc_url: &str, token_address: &str) -> Result<String, 
         "latest"
     ]);
 
-    let response: serde_json::Value = Provider::eth_call(rpc_url, "eth_call", params)
-        .await
-        .map_err(|e| e.to_string())?;
+    let response: serde_json::Value = eth_call(client, rpc_url, params).await?;
 
     let result_hex = response["result"]
         .as_str()
@@ -119,6 +137,69 @@ async fn get_token_symbol(rpc_url: &str, token_address: &str) -> Result<String, 
     let symbol = parse_bytes32_string(result_hex);
     
     Ok(symbol)
+}
+
+/// Get token name
+async fn get_token_name(client: &reqwest::Client, rpc_url: &str, token_address: &str) -> Result<String, String> {
+    // name() function selector: 0x06fdde03
+    let data = "0x06fdde03".to_string();
+    
+    let params = serde_json::json!([
+        {
+            "to": token_address,
+            "data": data
+        },
+        "latest"
+    ]);
+
+    let response: serde_json::Value = eth_call(client, rpc_url, params).await?;
+
+    let result_hex = response["result"]
+        .as_str()
+        .ok_or("Invalid response: missing result")?;
+
+    // Handle case where name() returns empty string (no name defined)
+    if result_hex == "0x0000000000000000000000000000000000000000000000000000000000000000" {
+        return Ok("Unknown".to_string());
+    }
+
+    Ok(parse_bytes32_string(result_hex))
+}
+
+/// Perform eth_call
+async fn eth_call(client: &reqwest::Client, rpc_url: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "eth_call",
+        "params": params,
+        "id": 1
+    });
+
+    let resp = client.post(rpc_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("eth_call failed: {}", e))?
+        .json::<EthCallResponse>()
+        .await
+        .map_err(|e| format!("RPC parse failed: {}", e))?;
+
+    if let Some(error) = resp.error {
+        return Err(error.message);
+    }
+
+    Ok(serde_json::json!({ "result": resp.result }))
+}
+
+#[derive(Debug, Deserialize)]
+struct EthCallResponse {
+    result: Option<String>,
+    error: Option<RpcError>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RpcError {
+    message: String,
 }
 
 /// Parse bytes32 string from hex

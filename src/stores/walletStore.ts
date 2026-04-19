@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { WalletData, BalanceInfo, Transaction } from '../types/wallet'
+import { WalletData, BalanceInfo, Transaction, CustomToken } from '../types/wallet'
 
 declare global {
   interface Window {
@@ -13,6 +13,7 @@ interface WalletStore {
   selectedChain: number
   balances: Record<string, Record<number, string>>
   transactions: Record<string, Transaction[]>
+  customTokens: CustomToken[]
   isLoading: boolean
 
   setSelectedChain: (chainId: number) => void
@@ -23,6 +24,9 @@ interface WalletStore {
   fetchBalance: (address: string) => Promise<void>
   sendTransaction: (walletId: string, to: string, amount: string, chainId: number) => Promise<{ success: boolean; txHash?: string; error?: string }>
   exportPrivateKey: (id: string, password: string) => Promise<string | null>
+  addCustomToken: (token: CustomToken) => void
+  removeCustomToken: (address: string, chainId: number) => void
+  getCustomTokens: (chainId?: number) => CustomToken[]
 }
 
 export const useWalletStore = create<WalletStore>()(
@@ -32,6 +36,7 @@ export const useWalletStore = create<WalletStore>()(
       selectedChain: 1,
       balances: {},
       transactions: {},
+      customTokens: [],
       isLoading: false,
 
       setSelectedChain: (chainId) => set({ selectedChain: chainId }),
@@ -138,12 +143,33 @@ export const useWalletStore = create<WalletStore>()(
           return null
         }
       },
+
+      addCustomToken: (token) => {
+        const tokens = get().customTokens
+        const exists = tokens.some(t => t.address.toLowerCase() === token.address.toLowerCase() && t.chainId === token.chainId)
+        if (!exists) {
+          set({ customTokens: [...tokens, token] })
+        }
+      },
+
+      removeCustomToken: (address, chainId) => {
+        const tokens = get().customTokens.filter(t => !(t.address.toLowerCase() === address.toLowerCase() && t.chainId === chainId))
+        set({ customTokens: tokens })
+      },
+
+      getCustomTokens: (chainId) => {
+        if (chainId !== undefined) {
+          return get().customTokens.filter(t => t.chainId === chainId)
+        }
+        return get().customTokens
+      },
     }),
     {
       name: 'token-vault-storage',
       partialize: (state) => ({
         wallets: state.wallets,
         selectedChain: state.selectedChain,
+        customTokens: state.customTokens,
       }),
     }
   )

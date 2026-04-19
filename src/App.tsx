@@ -7,6 +7,7 @@ import { WalletDashboard } from "./pages/WalletDashboard";
 import { WalletDetails } from "./pages/WalletDetails";
 import { SendTransfer } from "./pages/SendTransfer";
 import { BackupWallet } from "./pages/BackupWallet";
+import { TokenManagement } from "./pages/TokenManagement";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/wallet" element={<WalletDashboard />} />
       <Route path="/wallet/:id" element={<WalletDetails />} />
       <Route path="/send" element={<SendTransfer />} />
+      <Route path="/tokens" element={<TokenManagement />} />
       <Route path="/backup/:walletId" element={<BackupWallet />} />
     </Routes>
   );
