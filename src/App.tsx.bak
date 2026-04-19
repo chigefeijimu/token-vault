@@ -1,0 +1,33 @@
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useWalletStore } from './stores/walletStore';
+import WalletDashboard from './pages/WalletDashboard';
+import CreateWallet from './pages/CreateWallet';
+import ImportWallet from './pages/ImportWallet';
+import WalletDetails from './pages/WalletDetails';
+import SendPage from './pages/SendPage';
+
+function App() {
+  const { loadWalletsFromBackend } = useWalletStore();
+
+  useEffect(() => {
+    loadWalletsFromBackend();
+  }, [loadWalletsFromBackend]);
+
+  return (
+    <BrowserRouter>
+      <div className="app">
+        <Routes>
+          <Route path="/" element={<WalletDashboard />} />
+          <Route path="/create" element={<CreateWallet />} />
+          <Route path="/import" element={<ImportWallet />} />
+          <Route path="/wallet/:walletId" element={<WalletDetails />} />
+          <Route path="/send/:walletId" element={<SendPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+export default App;

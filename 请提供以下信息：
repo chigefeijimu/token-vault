@@ -1,0 +1,14 @@
+1. **cargo check 的完整错误输出** - 这是诊断问题的关键
+2. **要修复的源代码文件内容** - 需要修改的文件
+3. **要实现的功能描述** - 之前实现的是什么功能
+
+示例：
+```
+error[E0507]: cannot move out of `*self` which is behind a shared reference
+ --> src/main.rs:4:5
+  |
+4 |     self.value
+  |     ^^^^^^^^^^ move occurs because `self.value` has type `String`, which does not implement the `Copy` trait
+```
+
+请提供这些信息，我将帮您修复代码。

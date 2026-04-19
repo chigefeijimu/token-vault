@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hello Tauri</title>
+</head>
+<body>
+    <h1 id="hello"></h1>
+    <script type="module">
+        const { invoke } = window.__TAURI__.invoke;
+        invoke('hello').then(result => {
+            document.getElementById('hello').textContent = result;
+        });
+    </script>
+</body>
+</html>
