@@ -146,17 +146,7 @@ pub fn public_key_to_address(public_key: &str) -> String {
     format!("0x{}", hex::encode(&hash[12..]))
 }
 
-#[tauri::command]
-pub fn sign_data(data: &str, _private_key: &str) -> Result<String, String> {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
-    let mut hasher = Sha256::new();
-    hasher.update(data.as_bytes());
-    hasher.update(&bytes);
-    let result = hasher.finalize();
-    Ok(format!("0x{}", hex::encode(result)))
-}
+// NOTE: sign_data moved to transaction.rs (real implementation)
 
 #[tauri::command]
 pub fn encrypt_data(plaintext: String, key: String) -> Result<EncryptedData, String> {

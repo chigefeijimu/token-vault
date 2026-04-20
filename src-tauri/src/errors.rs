@@ -270,6 +270,8 @@ impl From<crate::transaction::TransactionError> for AppError {
             TransactionError::Rpc(msg) => (transaction_codes::BROADCAST_FAILED, msg),
             TransactionError::WalletNotFound(msg) => (wallet_codes::NOT_FOUND, msg),
             TransactionError::InvalidAddress(msg) => (wallet_codes::INVALID_ADDRESS, msg),
+            TransactionError::UnsupportedChain(msg) => (transaction_codes::BROADCAST_FAILED, msg.to_string()),
+            TransactionError::Encoding(msg) => (transaction_codes::BROADCAST_FAILED, msg),
         };
         Self::Transaction { code, message }
     }

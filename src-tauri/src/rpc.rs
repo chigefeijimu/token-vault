@@ -28,6 +28,7 @@ pub struct GasEstimateResult {
     pub gas_limit: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TransactionReceipt {
     pub transaction_hash: String,
@@ -42,6 +43,7 @@ pub struct TransactionReceipt {
     pub status: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TransactionLog {
     pub address: String,
@@ -354,25 +356,8 @@ pub async fn send_raw_transaction(
     Ok(tx_hash)
 }
 
-#[tauri::command]
-pub async fn get_transaction_receipt(
-    tx_hash: String,
-    _chain_id: u64,
-) -> Result<Option<TransactionReceipt>, String> {
-    // Stub: return mock receipt
-    Ok(Some(TransactionReceipt {
-        transaction_hash: tx_hash,
-        block_number: "0x1234567".to_string(),
-        block_hash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890".to_string(),
-        from: "0x0000000000000000000000000000000000000000".to_string(),
-        to: Some("0x0000000000000000000000000000000000000000".to_string()),
-        cumulative_gas_used: "0xae34".to_string(),
-        gas_used: "0x5208".to_string(),
-        effective_gas_price: "0x4A817C800".to_string(),
-        logs: vec![],
-        status: true,
-    }))
-}
+// NOTE: get_transaction_receipt moved to transaction.rs (real implementation)
+// NOTE: sign_data moved to transaction.rs (real implementation)
 
 #[tauri::command]
 pub async fn get_transaction_history(

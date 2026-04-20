@@ -35,7 +35,7 @@ pub fn run() {
             crypto::generate_private_key,
             crypto::derive_public_key,
             crypto::public_key_to_address,
-            crypto::sign_data,
+            crypto::encrypt_data,
             crypto::encrypt_data,
             crypto::decrypt_data,
             crypto::hash_data,
@@ -55,11 +55,12 @@ pub fn run() {
             rpc::get_gas_price,
             rpc::estimate_gas,
             rpc::send_raw_transaction,
-            rpc::get_transaction_receipt,
             rpc::get_transaction_history,
             // Transaction commands
             transaction::send_transaction,
             transaction::send_erc20_token,
+            transaction::get_transaction_receipt,
+            transaction::sign_data,
             // Version command
             version::get_version,
             // NFT commands

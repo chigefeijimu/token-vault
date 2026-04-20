@@ -23,7 +23,7 @@ tokio = { version = "1", features = ["full"] }
 thiserror = "1"
 argon2 = "0.5"
 reqwest = { version = "0.12", features = ["json"] }
-alloy = { version = "2", features = ["full", "reqwest"] }
+alloy = { version = "2", features = ["full", "reqwest", "signer-local"] }
 url = "2"
 solana-sdk = "4"
 solana-client = "4.0.0-beta.7"

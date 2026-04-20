@@ -1,6 +1,7 @@
 //! Chain adapter layer for multi-chain support
 //! Provides unified interface for different blockchain explorers
 
+use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -58,7 +59,7 @@ impl From<reqwest::Error> for ExplorerError {
 // ============== ChainExplorer Trait ==============
 
 /// Async trait for blockchain explorer adapters
-#[async_trait::async_trait]
+#[async_trait]
 pub trait ChainExplorer: Send + Sync {
     /// Get chain ID
     fn chain_id(&self) -> u64;
