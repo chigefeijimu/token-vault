@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::chain_adapter::ChainConfig;
+use crate::chain_adapter::{ChainConfig, ChainRegistry};
 
 // ============== Data Types ==============
 
@@ -366,12 +366,37 @@ pub async fn get_transaction_history(
     page: u32,
     page_size: u32,
 ) -> Result<TxHistoryResult, String> {
-    // For BSC (chain_id=56), try to use BSCScan API if we have an API key
+    // For BSC (chain_id=56), use BSCExplorer if we have an API key
     // BSCScan API provides complete tx history including native BNB transfers
     if chain_id == 56 {
-        // BSCScan requires API key. For now, fall back to block scan if no key.
-        // TODO: Get API key from environment or config
-        // For demo purposes, we'll use the fallback method
+        let registry = ChainRegistry::new();
+        if let Some(explorer) = registry.get_explorer(56) {
+            match explorer.get_tx_history(&address, page, page_size).await {
+                Ok(txs) => {
+                    return Ok(TxHistoryResult {
+                        transactions: txs.into_iter().map(|tx| TxHistoryItem {
+                            transaction_hash: tx.tx_hash,
+                            from: tx.from,
+                            to: tx.to,
+                            value: tx.value,
+                            gas_used: tx.gas_used.clone(),
+                            gas_price: tx.gas_price.clone(),
+                            timestamp: tx.timestamp,
+                            block_number: tx.block_number,
+                            block_hash: tx.block_hash,
+                            status: tx.status,
+                        }).collect(),
+                            total_count: (page * page_size + 100) as usize,
+                            has_more: true,
+                            page,
+                            page_size,
+                    });
+                }
+                Err(e) => {
+                    eprintln!("BSCExplorer failed, falling back to block scan: {}", e);
+                }
+            }
+        }
     }
     
     // Fallback: use eth_getLogs (only finds ERC20 token transfers, not native tx)
