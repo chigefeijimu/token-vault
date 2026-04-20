@@ -7,6 +7,7 @@ use std::time::Instant;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum SecurityError {
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
@@ -116,10 +117,12 @@ impl SecurityManager {
         self.auth_state.lock().unwrap().clone()
     }
 
+    #[allow(dead_code)]
     pub fn is_locked(&self) -> bool {
         self.auth_state.lock().unwrap().is_locked
     }
 
+    #[allow(dead_code)]
     pub fn is_authenticated(&self) -> bool {
         self.auth_state.lock().unwrap().is_authenticated
     }

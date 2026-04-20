@@ -70,8 +70,14 @@ pub struct TxHistoryItem {
 #[derive(Debug, serde::Serialize)]
 pub struct TxHistoryResult {
     pub transactions: Vec<TxHistoryItem>,
+    #[serde(rename = "totalCount")]
     pub total_count: usize,
+    #[serde(rename = "hasMore")]
     pub has_more: bool,
+    #[serde(rename = "page")]
+    pub page: u32,
+    #[serde(rename = "pageSize")]
+    pub page_size: u32,
 }
 
 // ============== RpcClient ==============
@@ -542,5 +548,7 @@ pub async fn get_transaction_history(
         transactions,
         total_count,
         has_more,
+        page,
+        page_size,
     })
 }

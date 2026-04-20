@@ -250,6 +250,7 @@ fn parse_bytes32_string(hex_str: &str) -> String {
 }
 
 /// Convert raw balance to human readable format
+#[allow(dead_code)]
 pub fn format_balance(raw_balance: &str, decimals: u8) -> String {
     if raw_balance == "0" {
         return "0".to_string();

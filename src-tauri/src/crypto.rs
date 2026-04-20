@@ -23,6 +23,8 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+#[allow(dead_code)]
 pub struct KeyPair {
     pub private_key: String,
     pub public_key: String,
