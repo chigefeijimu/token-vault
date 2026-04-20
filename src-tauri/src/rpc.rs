@@ -11,6 +11,8 @@ pub struct BalanceInfo {
     pub balance: String,
     pub symbol: String,
     pub decimals: u8,
+    #[serde(rename = "balanceFormatted")]
+    pub balance_formatted: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,11 +211,26 @@ pub async fn get_balance(address: String, chain_id: u64) -> Result<BalanceInfo, 
     };
 
     Ok(BalanceInfo {
-        address,
+        address: address.clone(),
         balance: balance_u128.to_string(),
         symbol: symbol.to_string(),
         decimals: 18,
+        balance_formatted: format_balance_wei(balance_u128, 18, &symbol),
     })
+}
+
+// Format wei to human-readable string
+fn format_balance_wei(wei: u128, decimals: u8, symbol: &str) -> String {
+    let divisor = 10u128.pow(decimals as u32);
+    let whole = wei / divisor;
+    let remainder = wei % divisor;
+    let decimals_str = format!("{:0>width$}", remainder, width = decimals as usize);
+    let decimals_part = &decimals_str[..decimals.min(8) as usize].trim_end_matches('0');
+    if decimals_part.is_empty() || *decimals_part == "0" {
+        format!("{} {}", whole, symbol)
+    } else {
+        format!("{}.{} {}", whole, decimals_part, symbol)
+    }
 }
 
 #[tauri::command]
