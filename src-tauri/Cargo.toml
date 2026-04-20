@@ -36,6 +36,7 @@ rlp = "0.5"
 primitive-types = "0.12"
 sha3 = "0.10"
 rusqlite = { version = "0.32", features = ["bundled"] }
+async-trait = "0.1"
 
 [profile.release]
 panic = "abort"

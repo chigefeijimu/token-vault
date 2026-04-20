@@ -1,4 +1,5 @@
 pub mod errors;
+pub mod chain_adapter;
 pub mod storage;
 mod crypto;
 mod wallet;

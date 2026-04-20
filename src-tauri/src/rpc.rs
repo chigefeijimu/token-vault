@@ -1,19 +1,9 @@
-use alloy::primitives::B256;
-use alloy::providers::Provider;
-use alloy::rpc::types::eth::Filter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// ============== Data Types ==============
+use crate::chain_adapter::ChainConfig;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainConfig {
-    pub chain_id: u64,
-    pub chain_name: String,
-    pub rpc_url: String,
-    pub native_currency: String,
-    pub explorer_url: String,
-}
+// ============== Data Types ==============
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BalanceInfo {
@@ -94,45 +84,51 @@ impl RpcClient {
         let mut chains = HashMap::new();
         chains.insert("ethereum".to_string(), ChainConfig {
             chain_id: 1,
-            chain_name: "Ethereum Mainnet".to_string(),
+            name: "Ethereum Mainnet".to_string(),
             rpc_url: "https://eth.llamarpc.com".to_string(),
             native_currency: "ETH".to_string(),
             explorer_url: "https://etherscan.io".to_string(),
+            symbol: "ETH".to_string(),
         });
         chains.insert("polygon".to_string(), ChainConfig {
             chain_id: 137,
-            chain_name: "Polygon Mainnet".to_string(),
+            name: "Polygon Mainnet".to_string(),
             rpc_url: "https://polygon-rpc.com".to_string(),
             native_currency: "MATIC".to_string(),
             explorer_url: "https://polygonscan.com".to_string(),
+            symbol: "MATIC".to_string(),
         });
         chains.insert("bsc".to_string(), ChainConfig {
             chain_id: 56,
-            chain_name: "BNB Smart Chain".to_string(),
+            name: "BNB Smart Chain".to_string(),
             rpc_url: "https://bsc-dataseed.binance.org".to_string(),
             native_currency: "BNB".to_string(),
             explorer_url: "https://bscscan.com".to_string(),
+            symbol: "BNB".to_string(),
         });
         chains.insert("arbitrum".to_string(), ChainConfig {
             chain_id: 42161,
-            chain_name: "Arbitrum One".to_string(),
+            name: "Arbitrum One".to_string(),
             rpc_url: "https://arb1.arbitrum.io/rpc".to_string(),
             native_currency: "ETH".to_string(),
             explorer_url: "https://arbiscan.io".to_string(),
+            symbol: "ETH".to_string(),
         });
         chains.insert("optimism".to_string(), ChainConfig {
             chain_id: 10,
-            chain_name: "Optimism".to_string(),
+            name: "Optimism".to_string(),
             rpc_url: "https://mainnet.optimism.io".to_string(),
             native_currency: "ETH".to_string(),
             explorer_url: "https://optimistic.etherscan.io".to_string(),
+            symbol: "ETH".to_string(),
         });
         chains.insert("avalanche".to_string(), ChainConfig {
             chain_id: 43114,
-            chain_name: "Avalanche C-Chain".to_string(),
+            name: "Avalanche C-Chain".to_string(),
             rpc_url: "https://api.avax.network/ext/bc/C/rpc".to_string(),
             native_currency: "AVAX".to_string(),
             explorer_url: "https://snowtrace.io".to_string(),
+            symbol: "AVAX".to_string(),
         });
         Self { chains }
     }
@@ -148,16 +144,6 @@ impl RpcClient {
             _ => return None,
         };
         self.chains.get(chain_name).cloned()
-    }
-
-    pub fn get_native_balance(&self, address: &str, chain_id: u64) -> Option<BalanceInfo> {
-        let config = self.get_chain_config(chain_id)?;
-        Some(BalanceInfo {
-            address: address.to_string(),
-            balance: "0".to_string(),
-            symbol: config.native_currency,
-            decimals: 18,
-        })
     }
 }
 
@@ -372,6 +358,15 @@ pub async fn get_transaction_history(
     page: u32,
     page_size: u32,
 ) -> Result<TxHistoryResult, String> {
+    // For BSC (chain_id=56), try to use BSCScan API if we have an API key
+    // BSCScan API provides complete tx history including native BNB transfers
+    if chain_id == 56 {
+        // BSCScan requires API key. For now, fall back to block scan if no key.
+        // TODO: Get API key from environment or config
+        // For demo purposes, we'll use the fallback method
+    }
+    
+    // Fallback: use eth_getLogs (only finds ERC20 token transfers, not native tx)
     let rpc_url = match chain_id {
         1 => "https://eth.llamarpc.com",
         56 => "https://bsc-dataseed.binance.org",
@@ -449,7 +444,7 @@ pub async fn get_transaction_history(
         let tx_hash = log["transactionHash"].as_str().unwrap_or("").to_string();
         let block_number = log["blockNumber"].as_str().unwrap_or("0x0");
         let block_num: u64 = u64::from_str_radix(block_number.trim_start_matches("0x"), 16).unwrap_or(0);
-        let log_index = log["logIndex"].as_u64().unwrap_or(0) as usize;
+        let _log_index = log["logIndex"].as_u64().unwrap_or(0) as usize;
 
         // Get block timestamp
         let block_params = serde_json::json!([
